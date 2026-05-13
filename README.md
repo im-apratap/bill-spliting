@@ -1,27 +1,21 @@
-# SolShare: Solana Native Crypto Expense Splitter
+# OmniSplit: Web2 & Web3 Payment Splitter
 
-SolShare is a mobile-first application natively built on the Solana blockchain using the Solana Mobile Stack (SMS). It solves the problem of splitting fiat expenses (like dinners, rent, trips) directly into cryptocurrency, providing real-time USD/SOL pricing and executing settlements directly on-chain using the Mobile Wallet Adapter (MWA).
-
-## Demo Video
-
-https://github.com/user-attachments/assets/c9ea6599-3682-4b3c-a6ae-76705b10415e
-
-Video Url - https://www.youtube.com/shorts/hNDvW_cN51s
+OmniSplit is a dual-mode mobile application built natively using React Native and Expo. It solves the problem of splitting expenses (like dinners, rent, trips) by allowing users to settle debts seamlessly via **Crypto (Solana)** or **Fiat (UPI / GPay / PhonePe)**.
 
 ## Features
 
-- **Mobile Foundation First**: Built natively using React Native and Expo. Seamlessly interacts with mobile hardware and Solana Mobile Stack features directly designed for smartphones.
-- **Smart AI Receipt Scanner**: Integration with Gemini AI allows users to instantly take a picture of a bill with their camera and dynamically prefill the expense title, extracted currency (e.g., INR or USD), and total split amount.
-- **On-chain Settlements & MWA Interface**: Instantly connect your phone's crypto wallet using the Solana MWA. Settle debts permissionlessly on the Solana network with full transaction verification.
-- **Real-Time Price Context**: Pulls the live price of SOL/USD and SOL/INR concurrently on a scalable caching backend to give users immediate feedback on exact crypto equivalents of fiat debts.
-- **Full Backend Logic**: Custom Node.js Express server to handle robust group coordination, user profile matching, historical activity fetching, and push notifications.
+- **Dual Mode (Fiat & Crypto)**: A single app to settle your debts on-chain with Solana MWA or off-chain using Indian UPI payment links.
+- **Mobile Foundation First**: Built natively using React Native and Expo for a smooth iOS and Android experience.
+- **Smart AI Receipt Scanner**: Integration with Gemini AI allows users to instantly take a picture of a bill with their camera and dynamically prefill the expense title, extracted currency, and total split amount.
+- **Real-Time Price Context**: Pulls the live price of SOL/USD and SOL/INR concurrently on a scalable backend to give users immediate feedback on crypto equivalents of fiat debts.
+- **Robust Backend**: Node.js Express server using PostgreSQL (Prisma ORM) to handle group coordination, user profile matching, historical activity fetching, and push notifications.
 
 ## Tech Stack
 
 - **Frontend App**: React Native, Expo, React Navigation
-- **Blockchain Interface**: Solana Web3.js, Solana Mobile Wallet Adapter (@solana-mobile/mobile-wallet-adapter-protocol)
-- **Backend Infrastructure**: Node.js, Express, MongoDB (Mongoose)
-- **Artificial Intelligence**: Google Gemini Vision AI (`@google/generative-ai`)
+- **Blockchain Interface**: Solana Web3.js, Solana Mobile Wallet Adapter
+- **Backend Infrastructure**: Node.js, Express, PostgreSQL, Prisma ORM
+- **Artificial Intelligence**: Google Gemini Vision AI
 
 ## Setting Up the Project Locally
 
@@ -32,16 +26,18 @@ Navigate into the server directory and create your `.env` file.
 ```bash
 cd server
 cp .env.example .env
-npm install
-npm run dev
+bun install
+bunx prisma db push
+bun run dev
 ```
 
 _Required Environment Variables (`.env`):_
 
 ```
 PORT=8000
-MONGODB_URI=your_mongodb_cluster_uri
-JWT_SECRET=your_secret_phrase
+DB_URI=your_postgresql_connection_uri_here
+ACCESS_TOKEN_SECRET=your_secret_phrase
+REFRESH_TOKEN_SECRET=your_secret_phrase
 GEMINI_API_KEY=your_gemini_api_key
 ```
 
@@ -52,7 +48,7 @@ In a new terminal, navigate to the `mobile` app and install its dependencies. En
 ```bash
 cd mobile
 cp .env.example .env
-npm install
+bun install
 npx expo start -c
 ```
 
@@ -71,9 +67,3 @@ EXPO_PUBLIC_SOLANA_NETWORK=devnet
   ```bash
   eas build -p android --profile preview
   ```
-
-## Hackathon Specifics Checklist
-
-- [x] Functional Android APK -> (`eas build`)
-- [x] Meaningful Network Interactions -> App creates live blockchain transactions.
-- [x] Built for Mobile -> Entirely native React Navigation with deep-linking protocols.

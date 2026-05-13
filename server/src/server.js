@@ -2,7 +2,6 @@ import express from "express";
 import cors from "cors";
 import cookieParser from "cookie-parser";
 import { ENV } from "./config/env.js";
-import connectDB from "./config/db.js";
 import { errorHandler } from "./middlewares/error.middleware.js";
 import userRoutes from "./routes/user.routes.js";
 import groupRoutes from "./routes/group.routes.js";
@@ -22,7 +21,7 @@ app.use(express.json({ limit: "10mb" }));
 app.use(express.urlencoded({ extended: true, limit: "10mb" }));
 app.use(cookieParser());
 app.get("/health", (req, res) => {
-  res.json({ status: "ok", message: "SolShare is running, hurray..." });
+  res.json({ status: "ok", message: "OmniSplit is running, hurray..." });
 });
 app.use("/api/users", userRoutes);
 app.use("/api/groups", groupRoutes);
@@ -34,7 +33,6 @@ app.use("/api/history", historyRoutes);
 app.use(errorHandler);
 const startServer = async () => {
   try {
-    await connectDB();
     if (ENV.NODE_ENV !== "production") {
       app.listen(ENV.PORT, () => {
         console.log(`Server running on PORT ${ENV.PORT}`);

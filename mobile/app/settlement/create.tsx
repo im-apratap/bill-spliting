@@ -7,7 +7,9 @@ import {
   ActivityIndicator,
   Modal,
   TouchableOpacity,
+  Alert,
 } from "react-native";
+import * as Linking from "expo-linking";
 import { router, useLocalSearchParams } from "expo-router";
 import { Container } from "../../src/components/Container";
 import { Input } from "../../src/components/Input";
@@ -29,6 +31,7 @@ export default function CreateSettlementScreen() {
   const [settlements, setSettlements] = useState<any[]>([]);
   const [currentUserId, setCurrentUserId] = useState<string>("");
   const [successModal, setSuccessModal] = useState(false);
+  const [paymentMode, setPaymentMode] = useState<"crypto" | "fiat">("crypto");
   const [txSignature, setTxSignature] = useState<string | null>(null);
   const [settledAmount, setSettledAmount] = useState<string>("");
   const [settledSolAmount, setSettledSolAmount] = useState<string>("");
@@ -109,7 +112,57 @@ export default function CreateSettlementScreen() {
         groupId,
         toUserId,
         amount: usdAmount,
+        isFiat: paymentMode === "fiat",
       });
+
+      if (paymentMode === "fiat") {
+        const { settlements } = res.data.data;
+        const s = settlements[0];
+        if (!s.toUpiId) {
+          throw new Error(`User @${s.to} has not set up their UPI ID yet.`);
+        }
+
+        const upiAmount =
+          preferredCurrency === "INR"
+            ? numericAmount
+            : numericAmount * ((solPriceINR || 1) / (solPrice || 1));
+
+        const upiUrl = `upi://pay?pa=${s.toUpiId}&pn=${s.to}&am=${upiAmount.toFixed(2)}&cu=INR`;
+        
+        try {
+          await Linking.openURL(upiUrl);
+        } catch (err) {
+          console.warn("Could not open UPI app, proceeding to confirmation", err);
+        }
+
+        Alert.alert(
+          "Confirm Payment",
+          "Did your UPI payment succeed?",
+          [
+            { text: "No", style: "cancel", onPress: () => setLoading(false) },
+            {
+              text: "Yes",
+              onPress: async () => {
+                try {
+                  const submitRes = await apiClient.post("/settlements/fiat-submit", {
+                    settlementIds: settlements.map((st: any) => st.settlementId),
+                  });
+                  setTxSignature(submitRes.data.data.txSignature || "FIAT_PAYMENT");
+                  setSettledAmount(amount);
+                  setSettledSolAmount("");
+                  setSuccessModal(true);
+                } catch (err: any) {
+                  setError(err.response?.data?.message || "Failed to confirm fiat payment");
+                } finally {
+                  setLoading(false);
+                }
+              },
+            },
+          ]
+        );
+        return; // Early return to wait for Alert callback
+      }
+
       const { serializedTransaction, settlements } = res.data.data;
       if (!serializedTransaction) {
         throw new Error("No transaction object received from server");
@@ -135,7 +188,9 @@ export default function CreateSettlementScreen() {
         err.response?.data?.message || err.message || "Failed to settle",
       );
     } finally {
-      setLoading(false);
+      if (paymentMode !== "fiat") {
+        setLoading(false);
+      }
     }
   };
   const handleViewOnSolscan = () => {
@@ -168,9 +223,9 @@ export default function CreateSettlementScreen() {
             <Text style={styles.successTitle}>Payment Sent!</Text>
             <Text style={styles.successSubtitle}>
               Successfully settled {getCurrencySymbol()}
-              {settledAmount} on Solana
+              {settledAmount} {paymentMode === "crypto" ? "on Solana" : "via UPI"}
             </Text>
-            {settledSolAmount !== "" && (
+            {paymentMode === "crypto" && settledSolAmount !== "" && (
               <View style={styles.solAmountBadge}>
                 <FontAwesome5 name="coins" size={14} color={colors.secondary} />
                 <Text style={styles.solAmountText}>{settledSolAmount} SOL</Text>
@@ -191,13 +246,15 @@ export default function CreateSettlementScreen() {
                 </Text>
               </View>
             )}
-            <TouchableOpacity
-              style={styles.solscanButton}
-              onPress={handleViewOnSolscan}
-            >
-              <FontAwesome5 name="external-link-alt" size={16} color="#FFF" />
-              <Text style={styles.solscanButtonText}>View on Solscan</Text>
-            </TouchableOpacity>
+            {paymentMode === "crypto" && txSignature && (
+              <TouchableOpacity
+                style={styles.solscanButton}
+                onPress={handleViewOnSolscan}
+              >
+                <FontAwesome5 name="external-link-alt" size={16} color="#FFF" />
+                <Text style={styles.solscanButtonText}>View on Solscan</Text>
+              </TouchableOpacity>
+            )}
             <Button
               title="Done"
               onPress={handleCloseSuccess}
@@ -215,9 +272,53 @@ export default function CreateSettlementScreen() {
           </Text>
         </View>
         <View style={styles.form}>
-          <View style={styles.checkoutBanner}>
-            <FontAwesome5 name="wallet" size={24} color={colors.secondary} />
-            <Text style={styles.checkoutText}>Solana Mainnet TX</Text>
+          <View style={styles.paymentModeContainer}>
+            <TouchableOpacity
+              style={[
+                styles.modeTab,
+                paymentMode === "crypto" && styles.modeTabActive,
+              ]}
+              onPress={() => setPaymentMode("crypto")}
+            >
+              <FontAwesome5
+                name="coins"
+                size={16}
+                color={
+                  paymentMode === "crypto" ? colors.surfaceLight : colors.textMuted
+                }
+              />
+              <Text
+                style={[
+                  styles.modeTabText,
+                  paymentMode === "crypto" && styles.modeTabTextActive,
+                ]}
+              >
+                Crypto
+              </Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[
+                styles.modeTab,
+                paymentMode === "fiat" && styles.modeTabActive,
+              ]}
+              onPress={() => setPaymentMode("fiat")}
+            >
+              <FontAwesome5
+                name="rupee-sign"
+                size={16}
+                color={
+                  paymentMode === "fiat" ? colors.surfaceLight : colors.textMuted
+                }
+              />
+              <Text
+                style={[
+                  styles.modeTabText,
+                  paymentMode === "fiat" && styles.modeTabTextActive,
+                ]}
+              >
+                Fiat (UPI)
+              </Text>
+            </TouchableOpacity>
           </View>
           {error ? <Text style={styles.errorText}>{error}</Text> : null}
           {members.length === 0 ? (
@@ -273,7 +374,11 @@ export default function CreateSettlementScreen() {
               </View>
             )}
           <Button
-            title="Sign & Send via Solana"
+            title={
+              paymentMode === "crypto"
+                ? "Sign & Send via Solana"
+                : "Pay via UPI App"
+            }
             onPress={handleSettle}
             loading={loading}
             style={styles.actionButton}
@@ -330,8 +435,34 @@ const styles = StyleSheet.create({
     marginBottom: 16,
   },
   actionButton: {
-    marginTop: 24,
-    marginBottom: 12,
+    marginTop: 16,
+  },
+  paymentModeContainer: {
+    flexDirection: "row",
+    backgroundColor: colors.surfaceLight,
+    borderRadius: 12,
+    padding: 4,
+    marginBottom: 20,
+  },
+  modeTab: {
+    flex: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    paddingVertical: 12,
+    borderRadius: 8,
+  },
+  modeTabActive: {
+    backgroundColor: colors.primary,
+  },
+  modeTabText: {
+    color: colors.textMuted,
+    fontWeight: "600",
+    marginLeft: 8,
+    fontSize: 15,
+  },
+  modeTabTextActive: {
+    color: colors.surfaceLight,
   },
   errorText: {
     color: colors.error,

@@ -11,6 +11,7 @@ import {
 import { Container } from "../../src/components/Container";
 import { Card } from "../../src/components/Card";
 import { Button } from "../../src/components/Button";
+import { Input } from "../../src/components/Input";
 import { colors } from "../../src/theme/colors";
 import { apiClient, clearTokens } from "../../src/api/client";
 import { FontAwesome5 } from "@expo/vector-icons";
@@ -24,6 +25,8 @@ export default function ProfileScreen() {
   const [balanceRaw, setBalanceRaw] = useState<number | null>(null);
   const [loading, setLoading] = useState(true);
   const [checkingBalance, setCheckingBalance] = useState(false);
+  const [upiIdInput, setUpiIdInput] = useState("");
+  const [updatingUpi, setUpdatingUpi] = useState(false);
   const { solPrice, solPriceINR } = useSolPrice();
   const { preferredCurrency, toggleCurrency, formatFiat } =
     useCurrencyPreference();
@@ -34,6 +37,9 @@ export default function ProfileScreen() {
     try {
       const res = await apiClient.get("/users/me");
       setUser(res.data.data);
+      if (res.data.data.upiId) {
+        setUpiIdInput(res.data.data.upiId);
+      }
     } catch (err: any) {
       console.error("Failed to fetch profile", err);
     } finally {
@@ -52,6 +58,23 @@ export default function ProfileScreen() {
       Alert.alert("Error", "Could not fetch balance from Solana network.");
     } finally {
       setCheckingBalance(false);
+    }
+  };
+
+  const handleUpdateUpi = async () => {
+    if (!upiIdInput.trim()) {
+      Alert.alert("Error", "Please enter a valid UPI ID");
+      return;
+    }
+    try {
+      setUpdatingUpi(true);
+      await apiClient.put("/users/upi", { upiId: upiIdInput.trim() });
+      setUser({ ...user, upiId: upiIdInput.trim() });
+      Alert.alert("Success", "UPI ID updated successfully!");
+    } catch (err: any) {
+      Alert.alert("Error", err.response?.data?.message || "Failed to update UPI ID");
+    } finally {
+      setUpdatingUpi(false);
     }
   };
   const handleLogout = async () => {
@@ -151,6 +174,31 @@ export default function ProfileScreen() {
                 </>
               )}
             </View>
+          </View>
+        </Card>
+
+        <Text style={styles.sectionTitle}>Fiat Details</Text>
+        <Card style={styles.walletCard}>
+          <FontAwesome5
+            name="rupee-sign"
+            size={24}
+            color={colors.secondary}
+            style={styles.walletIcon}
+          />
+          <View style={styles.walletInfo}>
+            <Text style={styles.walletLabel}>UPI ID (GPay / PhonePe / Paytm)</Text>
+            <Input
+              value={upiIdInput}
+              onChangeText={setUpiIdInput}
+              placeholder="e.g. user@okhdfcbank"
+              autoCapitalize="none"
+            />
+            <Button
+              title={user?.upiId ? "Update UPI ID" : "Save UPI ID"}
+              onPress={handleUpdateUpi}
+              loading={updatingUpi}
+              style={{ marginTop: 8 }}
+            />
           </View>
         </Card>
 
