@@ -11,13 +11,12 @@ export const Card: React.FC<CardProps> = ({ children, style }) => {
 const styles = StyleSheet.create({
   card: {
     backgroundColor: colors.surface,
-    borderRadius: 32, 
+    borderRadius: 16,
+    borderWidth: 1.5,
+    borderColor: colors.border,
     padding: 24,
     marginVertical: 10,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.05, 
-    shadowRadius: 16,
-    elevation: 2,
+    elevation: 0,
+    shadowOpacity: 0,
   },
 });

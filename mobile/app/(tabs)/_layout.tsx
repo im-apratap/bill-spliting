@@ -22,14 +22,15 @@ export default function TabLayout() {
           fontWeight: "700",
         },
         tabBarStyle: {
-          backgroundColor: "#1A1D1F",
-          borderTopWidth: 0,
+          backgroundColor: colors.surface,
+          borderTopWidth: 1.5,
+          borderTopColor: colors.border,
           height: Platform.OS === "ios" ? 85 : 65,
           paddingBottom: Platform.OS === "ios" ? 24 : 8,
           paddingTop: 8,
         },
-        tabBarActiveTintColor: "#FFFFFF",
-        tabBarInactiveTintColor: "#889098",
+        tabBarActiveTintColor: colors.primary,
+        tabBarInactiveTintColor: colors.textMuted,
       }}
     >
       <Tabs.Screen
