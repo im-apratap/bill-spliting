@@ -60,7 +60,7 @@ export default function AddMemberScreen() {
         <View style={styles.header}>
           <Text style={styles.title}>Add Member</Text>
           <Text style={styles.subtitle}>
-            Invite someone to the group using their SolShare username.
+            Invite someone to the group using their OmniSplit username.
           </Text>
         </View>
         <View style={styles.form}>

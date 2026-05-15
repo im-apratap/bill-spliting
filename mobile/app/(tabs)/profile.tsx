@@ -7,6 +7,7 @@ import {
   Alert,
   Platform,
   TouchableOpacity,
+  ScrollView
 } from "react-native";
 import { Container } from "../../src/components/Container";
 import { Card } from "../../src/components/Card";
@@ -118,144 +119,148 @@ export default function ProfileScreen() {
   }
   return (
     <Container>
-      <View style={styles.content}>
-        <Card style={styles.profileCard}>
-          <View style={styles.avatarContainer}>
-            <FontAwesome5 name="user-alt" size={40} color={colors.primary} />
-          </View>
-          <Text style={styles.name}>{user?.name || "User"}</Text>
-          <Text style={styles.username}>@{user?.username || "unknown"}</Text>
-          <Text style={styles.email}>{user?.email}</Text>
-        </Card>
-        <Text style={styles.sectionTitle}>Wallet Details</Text>
-        <Card style={styles.walletCard}>
-          <FontAwesome5
-            name="wallet"
-            size={24}
-            color={colors.secondary}
-            style={styles.walletIcon}
-          />
-          <View style={styles.walletInfo}>
-            <Text style={styles.walletLabel}>Solana Public Key</Text>
-            {user?.pubKey ? (
-              <Text
-                style={styles.walletKey}
-                numberOfLines={1}
-                ellipsizeMode="middle"
-              >
-                {user.pubKey}
+      <ScrollView>
+        <View style={styles.content}>
+          <Card style={styles.profileCard}>
+            <View style={styles.avatarContainer}>
+              <FontAwesome5 name="user-alt" size={40} color={colors.primary} />
+            </View>
+            <Text style={styles.name}>{user?.name || "User"}</Text>
+            <Text style={styles.username}>@{user?.username || "unknown"}</Text>
+            <Text style={styles.email}>{user?.email}</Text>
+          </Card>
+          <Text style={styles.sectionTitle}>Wallet Details</Text>
+          <Card style={styles.walletCard}>
+            <FontAwesome5
+              name="wallet"
+              size={24}
+              color={colors.secondary}
+              style={styles.walletIcon}
+            />
+            <View style={styles.walletInfo}>
+              <Text style={styles.walletLabel}>Solana Public Key</Text>
+              {user?.pubKey ? (
+                <Text
+                  style={styles.walletKey}
+                  numberOfLines={1}
+                  ellipsizeMode="middle"
+                >
+                  {user.pubKey}
+                </Text>
+              ) : (
+                <Button
+                  title="Connect Wallet"
+                  onPress={handleConnectWallet}
+                  variant="outline"
+                  style={{ marginTop: 8 }}
+                />
+              )}
+              <View style={styles.balanceContainer}>
+                {balance === null ? (
+                  <Button
+                    title="Check SOL Balance"
+                    onPress={checkBalance}
+                    loading={checkingBalance}
+                    variant="outline"
+                    style={styles.checkBalanceBtn}
+                  />
+                ) : (
+                  <>
+                    <Text style={styles.walletLabel}>Current Balance</Text>
+                    <Text style={styles.balanceAmount}>{balance}</Text>
+                    {balanceRaw !== null && solPrice !== null && (
+                      <Text style={styles.balanceUsd}>
+                        ~ {formatFiat(balanceRaw, solPrice, solPriceINR || 0)}
+                      </Text>
+                    )}
+                  </>
+                )}
+              </View>
+            </View>
+          </Card>
+
+          <Text style={styles.sectionTitle}>Fiat Details</Text>
+          <Card style={styles.walletCard}>
+            <FontAwesome5
+              name="rupee-sign"
+              size={24}
+              color={colors.secondary}
+              style={styles.walletIcon}
+            />
+            <View style={styles.walletInfo}>
+              <Text style={styles.walletLabel}>
+                UPI ID (GPay / PhonePe / Paytm)
               </Text>
-            ) : (
+              <Input
+                value={upiIdInput}
+                onChangeText={setUpiIdInput}
+                placeholder="e.g. user@okhdfcbank"
+                autoCapitalize="none"
+              />
               <Button
-                title="Connect Wallet"
-                onPress={handleConnectWallet}
-                variant="outline"
+                title={user?.upiId ? "Update UPI ID" : "Save UPI ID"}
+                onPress={handleUpdateUpi}
+                loading={updatingUpi}
                 style={{ marginTop: 8 }}
               />
-            )}
-            <View style={styles.balanceContainer}>
-              {balance === null ? (
-                <Button
-                  title="Check SOL Balance"
-                  onPress={checkBalance}
-                  loading={checkingBalance}
-                  variant="outline"
-                  style={styles.checkBalanceBtn}
-                />
-              ) : (
-                <>
-                  <Text style={styles.walletLabel}>Current Balance</Text>
-                  <Text style={styles.balanceAmount}>{balance}</Text>
-                  {balanceRaw !== null && solPrice !== null && (
-                    <Text style={styles.balanceUsd}>
-                      ~ {formatFiat(balanceRaw, solPrice, solPriceINR || 0)}
-                    </Text>
-                  )}
-                </>
-              )}
             </View>
-          </View>
-        </Card>
+          </Card>
 
-        <Text style={styles.sectionTitle}>Fiat Details</Text>
-        <Card style={styles.walletCard}>
-          <FontAwesome5
-            name="rupee-sign"
-            size={24}
-            color={colors.secondary}
-            style={styles.walletIcon}
-          />
-          <View style={styles.walletInfo}>
-            <Text style={styles.walletLabel}>UPI ID (GPay / PhonePe / Paytm)</Text>
-            <Input
-              value={upiIdInput}
-              onChangeText={setUpiIdInput}
-              placeholder="e.g. user@okhdfcbank"
-              autoCapitalize="none"
+          <Text style={styles.sectionTitle}>App Preferences</Text>
+          <Card style={styles.prefCard}>
+            <FontAwesome5
+              name="globe"
+              size={24}
+              color={colors.secondary}
+              style={styles.walletIcon}
             />
-            <Button
-              title={user?.upiId ? "Update UPI ID" : "Save UPI ID"}
-              onPress={handleUpdateUpi}
-              loading={updatingUpi}
-              style={{ marginTop: 8 }}
-            />
-          </View>
-        </Card>
-
-        <Text style={styles.sectionTitle}>App Preferences</Text>
-        <Card style={styles.prefCard}>
-          <FontAwesome5
-            name="globe"
-            size={24}
-            color={colors.secondary}
-            style={styles.walletIcon}
-          />
-          <View style={styles.prefInfo}>
-            <Text style={styles.walletLabel}>Display Currency</Text>
-            <View style={styles.currencyToggleGroup}>
-              <TouchableOpacity
-                style={[
-                  styles.segmentBtn,
-                  preferredCurrency === "USD" && styles.segmentBtnActive,
-                ]}
-                onPress={() => toggleCurrency("USD")}
-              >
-                <Text
+            <View style={styles.prefInfo}>
+              <Text style={styles.walletLabel}>Display Currency</Text>
+              <View style={styles.currencyToggleGroup}>
+                <TouchableOpacity
                   style={[
-                    styles.segmentText,
-                    preferredCurrency === "USD" && styles.segmentTextActive,
+                    styles.segmentBtn,
+                    preferredCurrency === "USD" && styles.segmentBtnActive,
                   ]}
+                  onPress={() => toggleCurrency("USD")}
                 >
-                  USD ($)
-                </Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={[
-                  styles.segmentBtn,
-                  preferredCurrency === "INR" && styles.segmentBtnActive,
-                ]}
-                onPress={() => toggleCurrency("INR")}
-              >
-                <Text
+                  <Text
+                    style={[
+                      styles.segmentText,
+                      preferredCurrency === "USD" && styles.segmentTextActive,
+                    ]}
+                  >
+                    USD ($)
+                  </Text>
+                </TouchableOpacity>
+                <TouchableOpacity
                   style={[
-                    styles.segmentText,
-                    preferredCurrency === "INR" && styles.segmentTextActive,
+                    styles.segmentBtn,
+                    preferredCurrency === "INR" && styles.segmentBtnActive,
                   ]}
+                  onPress={() => toggleCurrency("INR")}
                 >
-                  INR (₹)
-                </Text>
-              </TouchableOpacity>
+                  <Text
+                    style={[
+                      styles.segmentText,
+                      preferredCurrency === "INR" && styles.segmentTextActive,
+                    ]}
+                  >
+                    INR (₹)
+                  </Text>
+                </TouchableOpacity>
+              </View>
             </View>
-          </View>
-        </Card>
-        <View style={{ flex: 1 }} />
-        <Button
-          title="Sign Out"
-          onPress={handleLogout}
-          style={styles.logoutBtn}
-          textStyle={{ fontWeight: "700" }}
-        />
-      </View>
+          </Card>
+          <View style={{ flex: 1 }} />
+          <Button
+            title="Sign Out"
+            onPress={handleLogout}
+            style={styles.logoutBtn}
+            textStyle={{ fontWeight: "700" }}
+          />
+        </View>
+      </ScrollView>
     </Container>
   );
 }

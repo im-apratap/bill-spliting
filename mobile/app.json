@@ -1,10 +1,5 @@
 {
   "expo": {
-    "extra": {
-      "eas": {
-        "projectId": "8da8bf68-80df-4f01-90a6-160cb3c20c02"
-      }
-    },
     "name": "OmniSplit",
     "slug": "OmniSplit",
     "version": "1.0.0",
@@ -50,7 +45,8 @@
         "expo-build-properties",
         {
           "android": {
-            "enableProguardInReleaseBuilds": true
+            "enableProguardInReleaseBuilds": true,
+            "enableMinifyInReleaseBuilds": true
           }
         }
       ]
@@ -58,6 +54,12 @@
     "experiments": {
       "typedRoutes": true,
       "reactCompiler": true
+    },
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "980a8e63-4b2c-42f7-ae3c-80e54c82b688"
+      }
     }
   }
 }

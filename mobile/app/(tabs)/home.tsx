@@ -87,7 +87,7 @@ export default function HomeScreen() {
           <Text style={styles.greetingTitle}>
             Hello, {user?.name?.split(" ")[0] || "User"}
           </Text>
-          <Text style={styles.greetingSubtitle}>Welcome to SolShare</Text>
+          <Text style={styles.greetingSubtitle}>Welcome to OmniSplit</Text>
         </View>
         {}
         <View style={styles.priceBanner}>

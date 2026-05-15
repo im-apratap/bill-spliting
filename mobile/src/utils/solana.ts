@@ -6,8 +6,8 @@ if (typeof global.Buffer === "undefined") {
   global.Buffer = Buffer;
 }
 export const APP_IDENTITY = {
-  name: "SolShare",
-  uri: "https://im-apratap.github.io/solshare",
+  name: "OmniSplit",
+  uri: "https://github.com/im-apratap/OmniSplit",
   icon: "favicon.ico",
 };
 export const SOLANA_CLUSTER = "mainnet-beta";

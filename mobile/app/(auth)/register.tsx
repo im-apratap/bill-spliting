@@ -75,7 +75,7 @@ export default function RegisterScreen() {
         <ScrollView contentContainerStyle={styles.scrollContent}>
           <View style={styles.header}>
             <Text style={styles.title}>Create Account</Text>
-            <Text style={styles.subtitle}>Join SolShare today</Text>
+            <Text style={styles.subtitle}>Join OmniSplit today</Text>
           </View>
           <View style={styles.form}>
             {error ? <Text style={styles.errorText}>{error}</Text> : null}
