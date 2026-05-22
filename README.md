@@ -1,19 +1,17 @@
-# OmniSplit: Web2 & Web3 Payment Splitter
+# OmniSplit: Expense Splitter
 
-OmniSplit is a dual-mode mobile application built natively using React Native and Expo. It solves the problem of splitting expenses (like dinners, rent, trips) by allowing users to settle debts seamlessly via **Crypto (Solana)** or **Fiat (UPI / GPay / PhonePe)**.
+OmniSplit is a mobile application built with React Native and Expo. It helps groups split expenses like dinners, rent, and trips, then settle debts through real-money UPI payment links.
 
 ## Features
 
-- **Dual Mode (Fiat & Crypto)**: A single app to settle your debts on-chain with Solana MWA or off-chain using Indian UPI payment links.
+- **UPI Settlements**: Settle debts through Indian UPI payment links for GPay, PhonePe, Paytm, and other UPI apps.
 - **Mobile Foundation First**: Built natively using React Native and Expo for a smooth iOS and Android experience.
 - **Smart AI Receipt Scanner**: Integration with Gemini AI allows users to instantly take a picture of a bill with their camera and dynamically prefill the expense title, extracted currency, and total split amount.
-- **Real-Time Price Context**: Pulls the live price of SOL/USD and SOL/INR concurrently on a scalable backend to give users immediate feedback on crypto equivalents of fiat debts.
 - **Robust Backend**: Node.js Express server using PostgreSQL (Prisma ORM) to handle group coordination, user profile matching, historical activity fetching, and push notifications.
 
 ## Tech Stack
 
 - **Frontend App**: React Native, Expo, React Navigation
-- **Blockchain Interface**: Solana Web3.js, Solana Mobile Wallet Adapter
 - **Backend Infrastructure**: Node.js, Express, PostgreSQL, Prisma ORM
 - **Artificial Intelligence**: Google Gemini Vision AI
 
@@ -56,14 +54,13 @@ _Required Environment Variables (`.env`):_
 
 ```
 EXPO_PUBLIC_API_URL=http://<YOUR_LOCAL_NETWORK_IP>:8000/api
-EXPO_PUBLIC_SOLANA_NETWORK=devnet
 ```
 
 ### 3. Running on your device
 
 - **Dev mode**: Install the `Expo Go` app on your Android Phone. Scan the QR code given by `npx expo start`.
 - **Native APK Build**:
-  Since this app uses native modules (Solana MWA, Camera packages), we highly recommend building it into a standalone APK for the best performance and functionality:
+  Since this app uses native modules such as camera packages, use a native build for the best performance and functionality:
   ```bash
   eas build -p android --profile preview
   ```

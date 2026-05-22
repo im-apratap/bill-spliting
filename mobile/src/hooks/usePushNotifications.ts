@@ -6,13 +6,10 @@ export const usePushNotifications = () => {
   const responseListener = useRef<Notifications.Subscription>(null as any);
   useEffect(() => {
     notificationListener.current =
-      Notifications.addNotificationReceivedListener((notification) => {
-        console.log("Notification received:", notification);
-      });
+      Notifications.addNotificationReceivedListener(() => {});
     responseListener.current =
       Notifications.addNotificationResponseReceivedListener((response) => {
         const data = response.notification.request.content.data;
-        console.log("Notification response received:", data);
         if (data && data.groupId) {
           if (data.expenseId) {
             router.push(`/expense/${data.expenseId}` as any);

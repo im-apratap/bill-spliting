@@ -5,7 +5,6 @@ import {
   Text,
   ActivityIndicator,
   Alert,
-  Platform,
   TouchableOpacity,
   ScrollView
 } from "react-native";
@@ -17,20 +16,13 @@ import { colors } from "../../src/theme/colors";
 import { apiClient, clearTokens } from "../../src/api/client";
 import { FontAwesome5 } from "@expo/vector-icons";
 import { router } from "expo-router";
-import { connectWallet } from "../../src/utils/solana";
-import { useSolPrice } from "../../src/hooks/useSolPrice";
 import { useCurrencyPreference } from "../../src/hooks/useCurrencyPreference";
 export default function ProfileScreen() {
   const [user, setUser] = useState<any>(null);
-  const [balance, setBalance] = useState<string | null>(null);
-  const [balanceRaw, setBalanceRaw] = useState<number | null>(null);
   const [loading, setLoading] = useState(true);
-  const [checkingBalance, setCheckingBalance] = useState(false);
   const [upiIdInput, setUpiIdInput] = useState("");
   const [updatingUpi, setUpdatingUpi] = useState(false);
-  const { solPrice, solPriceINR } = useSolPrice();
-  const { preferredCurrency, toggleCurrency, formatFiat } =
-    useCurrencyPreference();
+  const { preferredCurrency, toggleCurrency } = useCurrencyPreference();
   useEffect(() => {
     fetchProfile();
   }, []);
@@ -47,21 +39,6 @@ export default function ProfileScreen() {
       setLoading(false);
     }
   };
-  const checkBalance = async () => {
-    try {
-      setCheckingBalance(true);
-      const balanceRes = await apiClient.get("/settlements/balance");
-      const solBalance = balanceRes.data.data.balance;
-      setBalanceRaw(solBalance);
-      setBalance(`${solBalance.toFixed(4)} SOL`);
-    } catch {
-      setBalance("Failed to load");
-      Alert.alert("Error", "Could not fetch balance from Solana network.");
-    } finally {
-      setCheckingBalance(false);
-    }
-  };
-
   const handleUpdateUpi = async () => {
     if (!upiIdInput.trim()) {
       Alert.alert("Error", "Please enter a valid UPI ID");
@@ -97,19 +74,6 @@ export default function ProfileScreen() {
       },
     ]);
   };
-  const handleConnectWallet = async () => {
-    try {
-      const pubKey = await connectWallet();
-      await apiClient.put("/users/pubkey", { pubKey });
-      setUser({ ...user, pubKey });
-      Alert.alert("Success", "Wallet connected successfully!");
-    } catch (err: any) {
-      console.error(err);
-      if (err?.message !== "User canceled request") {
-        Alert.alert("Error", err.message || "Failed to connect wallet.");
-      }
-    }
-  };
   if (loading) {
     return (
       <Container style={styles.centerElement}>
@@ -129,57 +93,7 @@ export default function ProfileScreen() {
             <Text style={styles.username}>@{user?.username || "unknown"}</Text>
             <Text style={styles.email}>{user?.email}</Text>
           </Card>
-          <Text style={styles.sectionTitle}>Wallet Details</Text>
-          <Card style={styles.walletCard}>
-            <FontAwesome5
-              name="wallet"
-              size={24}
-              color={colors.secondary}
-              style={styles.walletIcon}
-            />
-            <View style={styles.walletInfo}>
-              <Text style={styles.walletLabel}>Solana Public Key</Text>
-              {user?.pubKey ? (
-                <Text
-                  style={styles.walletKey}
-                  numberOfLines={1}
-                  ellipsizeMode="middle"
-                >
-                  {user.pubKey}
-                </Text>
-              ) : (
-                <Button
-                  title="Connect Wallet"
-                  onPress={handleConnectWallet}
-                  variant="outline"
-                  style={{ marginTop: 8 }}
-                />
-              )}
-              <View style={styles.balanceContainer}>
-                {balance === null ? (
-                  <Button
-                    title="Check SOL Balance"
-                    onPress={checkBalance}
-                    loading={checkingBalance}
-                    variant="outline"
-                    style={styles.checkBalanceBtn}
-                  />
-                ) : (
-                  <>
-                    <Text style={styles.walletLabel}>Current Balance</Text>
-                    <Text style={styles.balanceAmount}>{balance}</Text>
-                    {balanceRaw !== null && solPrice !== null && (
-                      <Text style={styles.balanceUsd}>
-                        ~ {formatFiat(balanceRaw, solPrice, solPriceINR || 0)}
-                      </Text>
-                    )}
-                  </>
-                )}
-              </View>
-            </View>
-          </Card>
-
-          <Text style={styles.sectionTitle}>Fiat Details</Text>
+          <Text style={styles.sectionTitle}>Payment Details</Text>
           <Card style={styles.walletCard}>
             <FontAwesome5
               name="rupee-sign"
@@ -324,31 +238,6 @@ const styles = StyleSheet.create({
     color: colors.textMuted,
     fontSize: 12,
     marginBottom: 4,
-  },
-  walletKey: {
-    color: colors.primary,
-    fontSize: 14,
-    fontFamily: Platform.OS === "ios" ? "Courier" : "monospace",
-  },
-  balanceContainer: {
-    marginTop: 12,
-    paddingTop: 12,
-    borderTopWidth: 1,
-    borderTopColor: colors.border,
-  },
-  balanceAmount: {
-    color: colors.secondary,
-    fontSize: 20,
-    fontWeight: "800",
-  },
-  balanceUsd: {
-    color: colors.textMuted,
-    fontSize: 14,
-    fontWeight: "600",
-    marginTop: 4,
-  },
-  checkBalanceBtn: {
-    marginTop: 4,
   },
   logoutBtn: {
     marginBottom: 16,

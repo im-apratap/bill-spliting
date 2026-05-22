@@ -1,12 +1,7 @@
-import "react-native-get-random-values";
-import { Buffer } from "buffer";
 import { Tabs } from "expo-router";
 import { FontAwesome5 } from "@expo/vector-icons";
 import { colors } from "../../src/theme/colors";
 import { Platform } from "react-native";
-if (typeof global.Buffer === "undefined") {
-  global.Buffer = Buffer;
-}
 export default function TabLayout() {
   return (
     <Tabs

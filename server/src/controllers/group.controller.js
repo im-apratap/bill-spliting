@@ -31,7 +31,7 @@ export const createGroup = async (req, res, next) => {
       include: {
         members: {
           include: {
-            user: { select: { id: true, name: true, username: true, pubKey: true } },
+            user: { select: { id: true, name: true, username: true } },
           },
         },
         createdBy: { select: { id: true, name: true, username: true } },
@@ -66,7 +66,7 @@ export const getUserGroups = async (req, res, next) => {
       include: {
         members: {
           include: {
-            user: { select: { id: true, name: true, username: true, pubKey: true } },
+            user: { select: { id: true, name: true, username: true } },
           },
         },
         createdBy: { select: { id: true, name: true, username: true } },
@@ -89,7 +89,7 @@ export const getGroupById = async (req, res, next) => {
       include: {
         members: {
           include: {
-            user: { select: { id: true, name: true, username: true, pubKey: true } },
+            user: { select: { id: true, name: true, username: true } },
           },
         },
         createdBy: { select: { id: true, name: true, username: true } },
@@ -160,7 +160,7 @@ export const addMember = async (req, res, next) => {
       include: {
         members: {
           include: {
-            user: { select: { id: true, name: true, username: true, pubKey: true } },
+            user: { select: { id: true, name: true, username: true } },
           },
         },
         createdBy: { select: { id: true, name: true, username: true } },
@@ -216,7 +216,7 @@ export const removeMember = async (req, res, next) => {
       include: {
         members: {
           include: {
-            user: { select: { id: true, name: true, username: true, pubKey: true } },
+            user: { select: { id: true, name: true, username: true } },
           },
         },
         createdBy: { select: { id: true, name: true, username: true } },

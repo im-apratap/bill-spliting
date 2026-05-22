@@ -3,7 +3,7 @@ import { ApiError } from "../utils/ApiError.js";
 import { ApiResponse } from "../utils/ApiResponse.js";
 import { Expo } from "expo-server-sdk";
 import { sendPushNotifications } from "../utils/notifications.js";
-import { getCachedExchangeRates } from "../utils/solana.js";
+import { convertToUSD } from "../utils/currency.js";
 
 const formatExpense = (e) => {
   return {
@@ -64,9 +64,9 @@ export const addExpense = async (req, res, next) => {
     }
 
     if (currency && currency.toUpperCase() === "INR") {
-      const { rates } = await getCachedExchangeRates();
-      const inrToUsdRate = rates.usd / rates.inr;
-      amount = amount * inrToUsdRate;
+      const originalAmount = amount;
+      amount = await convertToUSD(amount, "INR");
+      const inrToUsdRate = amount / originalAmount;
 
       if (splitType === "custom" && shares) {
         shares = shares.map((s) => ({
@@ -92,9 +92,9 @@ export const addExpense = async (req, res, next) => {
         },
       },
       include: {
-        paidBy: { select: { id: true, name: true, username: true, pubKey: true } },
-        splits: { include: { user: { select: { id: true, name: true, username: true, pubKey: true } } } },
-        shares: { include: { user: { select: { id: true, name: true, username: true, pubKey: true } } } },
+        paidBy: { select: { id: true, name: true, username: true } },
+        splits: { include: { user: { select: { id: true, name: true, username: true } } } },
+        shares: { include: { user: { select: { id: true, name: true, username: true } } } },
       },
     });
 
@@ -175,9 +175,9 @@ export const getGroupExpenses = async (req, res, next) => {
     const expenses = await prisma.expense.findMany({
       where: { groupId },
       include: {
-        paidBy: { select: { id: true, name: true, username: true, pubKey: true } },
-        splits: { include: { user: { select: { id: true, name: true, username: true, pubKey: true } } } },
-        shares: { include: { user: { select: { id: true, name: true, username: true, pubKey: true } } } },
+        paidBy: { select: { id: true, name: true, username: true } },
+        splits: { include: { user: { select: { id: true, name: true, username: true } } } },
+        shares: { include: { user: { select: { id: true, name: true, username: true } } } },
       },
       orderBy: { createdAt: "desc" },
     });
@@ -198,7 +198,7 @@ export const getGroupBalances = async (req, res, next) => {
       include: {
         members: {
           include: {
-            user: { select: { id: true, name: true, username: true, pubKey: true } },
+            user: { select: { id: true, name: true, username: true } },
           },
         },
       },
@@ -270,7 +270,6 @@ export const getGroupBalances = async (req, res, next) => {
         _id: m.userId,
         name: m.user.name,
         username: m.user.username,
-        pubKey: m.user.pubKey,
       };
     });
 
@@ -393,9 +392,9 @@ export const getExpense = async (req, res, next) => {
     const expense = await prisma.expense.findUnique({
       where: { id: expenseId },
       include: {
-        paidBy: { select: { id: true, name: true, username: true, pubKey: true } },
-        splits: { include: { user: { select: { id: true, name: true, username: true, pubKey: true } } } },
-        shares: { include: { user: { select: { id: true, name: true, username: true, pubKey: true } } } },
+        paidBy: { select: { id: true, name: true, username: true } },
+        splits: { include: { user: { select: { id: true, name: true, username: true } } } },
+        shares: { include: { user: { select: { id: true, name: true, username: true } } } },
       },
     });
 
@@ -494,9 +493,9 @@ export const updateExpense = async (req, res, next) => {
         })
       },
       include: {
-        paidBy: { select: { id: true, name: true, username: true, pubKey: true } },
-        splits: { include: { user: { select: { id: true, name: true, username: true, pubKey: true } } } },
-        shares: { include: { user: { select: { id: true, name: true, username: true, pubKey: true } } } },
+        paidBy: { select: { id: true, name: true, username: true } },
+        splits: { include: { user: { select: { id: true, name: true, username: true } } } },
+        shares: { include: { user: { select: { id: true, name: true, username: true } } } },
       },
     });
 

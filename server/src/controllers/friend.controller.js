@@ -157,7 +157,7 @@ export const getFriends = async (req, res) => {
     const user = await prisma.user.findUnique({
       where: { id: userId },
       include: {
-        friends: { select: { id: true, name: true, username: true, email: true, pubKey: true } },
+        friends: { select: { id: true, name: true, username: true, email: true } },
       },
     });
 
@@ -181,7 +181,7 @@ export const getPendingRequests = async (req, res) => {
         status: "pending",
       },
       include: {
-        sender: { select: { id: true, name: true, username: true, pubKey: true } },
+        sender: { select: { id: true, name: true, username: true } },
       },
       orderBy: { createdAt: "desc" },
     });

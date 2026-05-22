@@ -15,7 +15,6 @@ import { apiClient } from "../../src/api/client";
 import { Container } from "../../src/components/Container";
 import { FontAwesome5, MaterialIcons } from "@expo/vector-icons";
 import { formatDistanceToNow } from "date-fns";
-import { openSolscanTx } from "../../src/utils/solana";
 type Group = {
   _id: string;
   name: string;
@@ -26,7 +25,6 @@ type HistoryLog = {
   description: string;
   group?: Group;
   createdAt: string;
-  txSignature?: string;
 };
 export default function HistoryScreen() {
   const [history, setHistory] = useState<HistoryLog[]>([]);
@@ -115,7 +113,6 @@ export default function HistoryScreen() {
   };
   const renderHistoryItem = ({ item }: { item: HistoryLog }) => {
     const { icon, color, iconFamily } = getActionDetails(item.actionType);
-    const isSettlement = item.actionType.includes("SETTLEMENT");
     return (
       <View style={styles.card}>
         <View style={[styles.iconContainer, { backgroundColor: `${color}15` }]}>
@@ -131,15 +128,6 @@ export default function HistoryScreen() {
             )}
             <Text style={styles.time}>{formatTime(item.createdAt)}</Text>
           </View>
-          {isSettlement && item.txSignature && (
-            <TouchableOpacity
-              style={styles.solscanLink}
-              onPress={() => openSolscanTx(item.txSignature!)}
-            >
-              <FontAwesome5 name="external-link-alt" size={12} color={colors.secondary} />
-              <Text style={styles.solscanLinkText}>View on Solscan</Text>
-            </TouchableOpacity>
-          )}
         </View>
       </View>
     );
@@ -336,19 +324,5 @@ const styles = StyleSheet.create({
     color: colors.textMuted,
     marginTop: 16,
     fontSize: 16,
-  },
-  solscanLink: {
-    flexDirection: "row",
-    alignItems: "center",
-    marginTop: 10,
-    paddingTop: 10,
-    borderTopWidth: 1,
-    borderTopColor: colors.border,
-  },
-  solscanLinkText: {
-    color: colors.secondary,
-    fontSize: 13,
-    fontWeight: "600",
-    marginLeft: 6,
   },
 });

@@ -67,7 +67,7 @@ export default function AddMemberScreen() {
           {error ? <Text style={styles.errorText}>{error}</Text> : null}
           <Input
             label="Username"
-            placeholder="e.g. solanawhale"
+            placeholder="e.g. aaditya"
             value={username}
             onChangeText={setUsername}
             autoCapitalize="none"

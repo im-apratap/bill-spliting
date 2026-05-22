@@ -1,23 +1,14 @@
+import { Expo } from "expo-server-sdk";
 import { prisma } from "../db/prisma.js";
 import { ApiError } from "../utils/ApiError.js";
 import { ApiResponse } from "../utils/ApiResponse.js";
-import {
-  buildTransferTransaction,
-  buildBatchTransferTransaction,
-  verifyTransaction,
-  getBalance,
-  connection,
-  getExchangeRates,
-  getCachedExchangeRates,
-} from "../utils/solana.js";
-import { Expo } from "expo-server-sdk";
 import { sendPushNotifications } from "../utils/notifications.js";
 
-const formatSettlement = (s) => ({
-  ...s,
-  _id: s.id,
-  from: s.from ? { ...s.from, _id: s.from.id } : null,
-  to: s.to ? { ...s.to, _id: s.to.id } : null,
+const formatSettlement = (settlement) => ({
+  ...settlement,
+  _id: settlement.id,
+  from: settlement.from ? { ...settlement.from, _id: settlement.from.id } : null,
+  to: settlement.to ? { ...settlement.to, _id: settlement.to.id } : null,
 });
 
 const calculateNetBalances = async (groupId) => {
@@ -25,7 +16,17 @@ const calculateNetBalances = async (groupId) => {
     where: { id: groupId },
     include: {
       members: {
-        include: { user: { select: { id: true, name: true, username: true, pubKey: true } } },
+        include: {
+          user: {
+            select: {
+              id: true,
+              name: true,
+              username: true,
+              upiId: true,
+              expoPushToken: true,
+            },
+          },
+        },
       },
     },
   });
@@ -38,22 +39,15 @@ const calculateNetBalances = async (groupId) => {
   });
 
   const balances = {};
-  group.members.forEach((m) => {
-    balances[m.userId] = 0;
+  group.members.forEach((member) => {
+    balances[member.userId] = 0;
   });
 
   for (const expense of expenses) {
     const payerId = expense.paidById;
     if (balances[payerId] === undefined) balances[payerId] = 0;
 
-    if (expense.splitType === "equal" || !expense.splitType) {
-      const perPerson = expense.amount / expense.splits.length;
-      balances[payerId] += expense.amount;
-      expense.splits.forEach((split) => {
-        if (balances[split.userId] === undefined) balances[split.userId] = 0;
-        balances[split.userId] -= perPerson;
-      });
-    } else if (expense.splitType === "custom" && expense.shares.length > 0) {
+    if (expense.splitType === "custom" && expense.shares.length > 0) {
       balances[payerId] += expense.amount;
       expense.shares.forEach((share) => {
         if (balances[share.userId] === undefined) balances[share.userId] = 0;
@@ -65,6 +59,13 @@ const calculateNetBalances = async (groupId) => {
         if (balances[share.userId] === undefined) balances[share.userId] = 0;
         balances[share.userId] -= (share.amount / 100) * expense.amount;
       });
+    } else {
+      const perPerson = expense.amount / expense.splits.length;
+      balances[payerId] += expense.amount;
+      expense.splits.forEach((split) => {
+        if (balances[split.userId] === undefined) balances[split.userId] = 0;
+        balances[split.userId] -= perPerson;
+      });
     }
   }
 
@@ -73,10 +74,12 @@ const calculateNetBalances = async (groupId) => {
   });
 
   for (const settlement of confirmedSettlements) {
-    const fromId = settlement.fromId;
-    const toId = settlement.toId;
-    if (balances[fromId] !== undefined) balances[fromId] += settlement.amount;
-    if (balances[toId] !== undefined) balances[toId] -= settlement.amount;
+    if (balances[settlement.fromId] !== undefined) {
+      balances[settlement.fromId] += settlement.amount;
+    }
+    if (balances[settlement.toId] !== undefined) {
+      balances[settlement.toId] -= settlement.amount;
+    }
   }
 
   const settlements = [];
@@ -95,22 +98,25 @@ const calculateNetBalances = async (groupId) => {
   debtors.sort((a, b) => b.amount - a.amount);
   creditors.sort((a, b) => b.amount - a.amount);
 
-  let i = 0;
-  let j = 0;
-
-  while (i < debtors.length && j < creditors.length) {
-    const settleAmount = Math.min(debtors[i].amount, creditors[j].amount);
+  let debtorIndex = 0;
+  let creditorIndex = 0;
+  while (debtorIndex < debtors.length && creditorIndex < creditors.length) {
+    const settleAmount = Math.min(
+      debtors[debtorIndex].amount,
+      creditors[creditorIndex].amount,
+    );
     if (settleAmount > 0.01) {
       settlements.push({
-        from: debtors[i].userId,
-        to: creditors[j].userId,
+        from: debtors[debtorIndex].userId,
+        to: creditors[creditorIndex].userId,
         amount: Math.round(settleAmount * 100) / 100,
       });
     }
-    debtors[i].amount -= settleAmount;
-    creditors[j].amount -= settleAmount;
-    if (debtors[i].amount < 0.01) i++;
-    if (creditors[j].amount < 0.01) j++;
+
+    debtors[debtorIndex].amount -= settleAmount;
+    creditors[creditorIndex].amount -= settleAmount;
+    if (debtors[debtorIndex].amount < 0.01) debtorIndex++;
+    if (creditors[creditorIndex].amount < 0.01) creditorIndex++;
   }
 
   return { group, settlements };
@@ -118,27 +124,36 @@ const calculateNetBalances = async (groupId) => {
 
 export const createSettlement = async (req, res, next) => {
   try {
-    const { groupId, toUserId, amount, isFiat } = req.body;
+    const { groupId, toUserId, amount } = req.body;
     if (!groupId) {
       throw new ApiError(400, "groupId is required");
     }
 
     const { group, settlements } = await calculateNetBalances(groupId);
-
-    const isMember = group.members.some((m) => m.userId === req.user.id);
+    const isMember = group.members.some((member) => member.userId === req.user.id);
     if (!isMember) {
       throw new ApiError(403, "You are not a member of this group");
     }
 
-    let userSettlements = settlements.filter((s) => s.from === req.user.id);
+    let userSettlements = settlements.filter(
+      (settlement) => settlement.from === req.user.id,
+    );
 
     if (toUserId && amount) {
-      const matchingSettlement = userSettlements.find((s) => s.to === toUserId);
+      const matchingSettlement = userSettlements.find(
+        (settlement) => settlement.to === toUserId,
+      );
       if (!matchingSettlement) {
-        throw new ApiError(400, "You do not owe this user anything according to the calculated balances.");
+        throw new ApiError(
+          400,
+          "You do not owe this user anything according to the calculated balances.",
+        );
       }
-      if (amount > matchingSettlement.amount + 0.05) {
-        throw new ApiError(400, `You only owe ${matchingSettlement.amount} to this user.`);
+      if (Number(amount) > matchingSettlement.amount + 0.05) {
+        throw new ApiError(
+          400,
+          `You only owe ${matchingSettlement.amount} to this user.`,
+        );
       }
       userSettlements = [
         {
@@ -150,250 +165,47 @@ export const createSettlement = async (req, res, next) => {
     }
 
     if (userSettlements.length === 0) {
-      return res.status(200).json(new ApiResponse(200, { transactions: [] }, "You don't owe anything in this group"));
+      return res
+        .status(200)
+        .json(new ApiResponse(200, { settlements: [] }, "You don't owe anything in this group"));
     }
 
     const memberMap = {};
-    group.members.forEach((m) => {
-      memberMap[m.userId] = m.user;
+    group.members.forEach((member) => {
+      memberMap[member.userId] = member.user;
     });
 
-    const userPubKey = memberMap[req.user.id]?.pubKey;
-
-    const exchangeRates = await getExchangeRates();
-    const solPrice = exchangeRates.usd;
-    const totalOweUSD = userSettlements.reduce((sum, s) => sum + s.amount, 0);
-    const totalOweSOL = totalOweUSD / solPrice;
-
-    // For crypto, verify balance
-    if (!isFiat) {
-      if (!userPubKey) {
-        throw new ApiError(400, "Your wallet public key is not set");
-      }
-      const balance = await getBalance(userPubKey);
-      if (balance < totalOweSOL) {
-        throw new ApiError(400, `Insufficient balance. You have ${balance.toFixed(4)} SOL but owe ${totalOweSOL.toFixed(4)} SOL ($${totalOweUSD.toFixed(2)})`);
-      }
-    }
-
     const settlementRecords = [];
-    for (const s of userSettlements) {
-      const amountInSOL = s.amount / solPrice;
+    for (const settlement of userSettlements) {
       const record = await prisma.settlement.create({
         data: {
           groupId,
           fromId: req.user.id,
-          toId: s.to,
-          amount: s.amount,
-          amountInLamports: Math.round(amountInSOL * 1000000000),
+          toId: settlement.to,
+          amount: settlement.amount,
           status: "pending",
         },
       });
       settlementRecords.push(record);
     }
 
-    if (isFiat) {
-      return res.status(200).json(
-        new ApiResponse(
-          200,
-          {
-            settlements: userSettlements.map((s, i) => ({
-              settlementId: settlementRecords[i].id,
-              to: memberMap[s.to].username,
-              toUpiId: memberMap[s.to].upiId,
-              amount: s.amount,
-            })),
-            totalAmountUSD: totalOweUSD,
-          },
-          "Fiat settlement created. Proceed to UPI."
-        )
-      );
-    }
-
-    const transfers = userSettlements.map((s) => {
-      const amountInSOL = s.amount / solPrice;
-      return {
-        toPubkey: memberMap[s.to].pubKey,
-        amountInSOL: Math.max(0.000000001, amountInSOL),
-        toUser: memberMap[s.to],
-      };
-    });
-
-    const memo = JSON.stringify({
-      type: "settlement",
-      groupId: group.id,
-      groupName: group.name,
-      note: "Settled via OmniSplit",
-    });
-
-    let transactionData;
-    if (transfers.length === 1) {
-      transactionData = await buildTransferTransaction(userPubKey, transfers[0].toPubkey, transfers[0].amountInSOL, memo);
-    } else {
-      transactionData = await buildBatchTransferTransaction(userPubKey, transfers, memo);
-    }
-
     return res.status(200).json(
       new ApiResponse(
         200,
         {
-          serializedTransaction: transactionData.transaction,
-          blockhash: transactionData.blockhash,
-          settlements: userSettlements.map((s, i) => ({
-            settlementId: settlementRecords[i].id,
-            to: memberMap[s.to].username,
-            toPubKey: memberMap[s.to].pubKey,
-            amount: s.amount,
+          settlements: userSettlements.map((settlement, index) => ({
+            settlementId: settlementRecords[index].id,
+            to: memberMap[settlement.to].username,
+            toUpiId: memberMap[settlement.to].upiId,
+            amount: settlement.amount,
           })),
-          totalAmount: totalOweSOL,
-          totalAmountUSD: totalOweUSD,
+          totalAmountUSD: userSettlements.reduce(
+            (sum, settlement) => sum + settlement.amount,
+            0,
+          ),
         },
-        "Settlement transaction created. Sign and submit from your wallet."
-      )
-    );
-  } catch (error) {
-    next(error);
-  }
-};
-
-export const confirmSettlement = async (req, res, next) => {
-  try {
-    const { settlementIds, txSignature } = req.body;
-    if (!settlementIds || !txSignature) {
-      throw new ApiError(400, "settlementIds and txSignature are required");
-    }
-
-    const verification = await verifyTransaction(txSignature);
-    if (!verification.confirmed) {
-      await prisma.settlement.updateMany({
-        where: { id: { in: settlementIds } },
-        data: { status: "failed", txSignature },
-      });
-      throw new ApiError(400, "Transaction not confirmed on Solana");
-    }
-
-    await prisma.settlement.updateMany({
-      where: { id: { in: settlementIds } },
-      data: { status: "confirmed", txSignature },
-    });
-
-    const updatedSettlements = await prisma.settlement.findMany({
-      where: { id: { in: settlementIds } },
-      include: {
-        from: { select: { id: true, name: true, username: true, pubKey: true } },
-        to: { select: { id: true, name: true, username: true, pubKey: true } },
-        group: { select: { id: true, name: true } },
-      },
-    });
-
-    for (const s of updatedSettlements) {
-      await prisma.history.create({
-        data: {
-          userId: s.fromId,
-          actionType: "SETTLEMENT_CONFIRMED",
-          groupId: s.groupId,
-          description: `You settled $${s.amount.toFixed(2)} with ${s.to.name}`,
-          txSignature,
-        },
-      });
-      await prisma.history.create({
-        data: {
-          userId: s.toId,
-          actionType: "SETTLEMENT_CONFIRMED",
-          groupId: s.groupId,
-          description: `${s.from.name} settled $${s.amount.toFixed(2)} with you`,
-          txSignature,
-        },
-      });
-    }
-
-    return res.status(200).json(
-      new ApiResponse(200, { settlements: updatedSettlements.map(formatSettlement), txSignature }, "Settlement confirmed on-chain")
-    );
-  } catch (error) {
-    next(error);
-  }
-};
-
-export const submitSignedTransaction = async (req, res, next) => {
-  try {
-    const { signedTransaction, settlementIds } = req.body;
-    if (!signedTransaction || !settlementIds) {
-      throw new ApiError(400, "signedTransaction and settlementIds are required");
-    }
-
-    const txBuffer = Buffer.from(signedTransaction, "base64");
-    const txSignature = await connection.sendRawTransaction(txBuffer, {
-      skipPreflight: false,
-      preflightCommitment: "confirmed",
-    });
-
-    const { blockhash, lastValidBlockHeight } = await connection.getLatestBlockhash();
-    const confirmation = await connection.confirmTransaction(
-      { signature: txSignature, blockhash, lastValidBlockHeight },
-      "confirmed"
-    );
-
-    if (confirmation.value.err) {
-      await prisma.settlement.updateMany({
-        where: { id: { in: settlementIds } },
-        data: { status: "failed", txSignature },
-      });
-      throw new ApiError(400, "Transaction failed on-chain");
-    }
-
-    await prisma.settlement.updateMany({
-      where: { id: { in: settlementIds } },
-      data: { status: "confirmed", txSignature },
-    });
-
-    const updatedSettlements = await prisma.settlement.findMany({
-      where: { id: { in: settlementIds } },
-      include: {
-        from: { select: { id: true, name: true, username: true, pubKey: true } },
-        to: { select: { id: true, name: true, username: true, pubKey: true, expoPushToken: true } },
-        group: { select: { id: true, name: true } },
-      },
-    });
-
-    const messages = [];
-    for (const s of updatedSettlements) {
-      await prisma.history.create({
-        data: {
-          userId: s.fromId,
-          actionType: "SETTLEMENT_CONFIRMED",
-          groupId: s.groupId,
-          description: `You settled $${s.amount.toFixed(2)} with ${s.to.name}`,
-          txSignature,
-        },
-      });
-      await prisma.history.create({
-        data: {
-          userId: s.toId,
-          actionType: "SETTLEMENT_CONFIRMED",
-          groupId: s.groupId,
-          description: `${s.from.name} settled $${s.amount.toFixed(2)} with you`,
-          txSignature,
-        },
-      });
-
-      if (s.to.expoPushToken && Expo.isExpoPushToken(s.to.expoPushToken)) {
-        messages.push({
-          to: s.to.expoPushToken,
-          sound: "default",
-          title: "Payment Received",
-          body: `${s.from.name} just paid you $${s.amount.toFixed(2)} in Crypto! 💸`,
-          data: { groupId: s.groupId },
-        });
-      }
-    }
-
-    if (messages.length > 0) {
-      sendPushNotifications(messages).catch(console.error);
-    }
-
-    return res.status(200).json(
-      new ApiResponse(200, { settlements: updatedSettlements.map(formatSettlement), txSignature }, "Transaction submitted and confirmed on-chain!")
+        "Settlement created. Proceed to UPI.",
+      ),
     );
   } catch (error) {
     next(error);
@@ -407,50 +219,56 @@ export const submitFiatSettlement = async (req, res, next) => {
       throw new ApiError(400, "settlementIds array is required");
     }
 
-    const txSignature = `FIAT_${Date.now()}_${Math.random().toString(36).substring(7)}`;
-
     await prisma.settlement.updateMany({
       where: { id: { in: settlementIds } },
-      data: { status: "confirmed", txSignature },
+      data: { status: "confirmed" },
     });
 
     const updatedSettlements = await prisma.settlement.findMany({
       where: { id: { in: settlementIds } },
       include: {
         from: { select: { id: true, name: true, username: true } },
-        to: { select: { id: true, name: true, username: true, expoPushToken: true } },
+        to: {
+          select: {
+            id: true,
+            name: true,
+            username: true,
+            expoPushToken: true,
+          },
+        },
         group: { select: { id: true, name: true } },
       },
     });
 
     const messages = [];
-    for (const s of updatedSettlements) {
+    for (const settlement of updatedSettlements) {
       await prisma.history.create({
         data: {
-          userId: s.fromId,
+          userId: settlement.fromId,
           actionType: "SETTLEMENT_CONFIRMED",
-          groupId: s.groupId,
-          description: `You settled $${s.amount.toFixed(2)} with ${s.to.name} via Fiat`,
-          txSignature,
+          groupId: settlement.groupId,
+          description: `You settled $${settlement.amount.toFixed(2)} with ${settlement.to.name} via UPI`,
         },
       });
       await prisma.history.create({
         data: {
-          userId: s.toId,
+          userId: settlement.toId,
           actionType: "SETTLEMENT_CONFIRMED",
-          groupId: s.groupId,
-          description: `${s.from.name} settled $${s.amount.toFixed(2)} with you via Fiat`,
-          txSignature,
+          groupId: settlement.groupId,
+          description: `${settlement.from.name} settled $${settlement.amount.toFixed(2)} with you via UPI`,
         },
       });
 
-      if (s.to.expoPushToken && Expo.isExpoPushToken(s.to.expoPushToken)) {
+      if (
+        settlement.to.expoPushToken &&
+        Expo.isExpoPushToken(settlement.to.expoPushToken)
+      ) {
         messages.push({
-          to: s.to.expoPushToken,
+          to: settlement.to.expoPushToken,
           sound: "default",
-          title: "Fiat Payment Received",
-          body: `${s.from.name} just paid you $${s.amount.toFixed(2)} via Fiat! 💸`,
-          data: { groupId: s.groupId },
+          title: "Payment Received",
+          body: `${settlement.from.name} just paid you $${settlement.amount.toFixed(2)} via UPI.`,
+          data: { groupId: settlement.groupId },
         });
       }
     }
@@ -460,7 +278,11 @@ export const submitFiatSettlement = async (req, res, next) => {
     }
 
     return res.status(200).json(
-      new ApiResponse(200, { settlements: updatedSettlements.map(formatSettlement), txSignature }, "Fiat settlement confirmed!")
+      new ApiResponse(
+        200,
+        { settlements: updatedSettlements.map(formatSettlement) },
+        "Settlement confirmed!",
+      ),
     );
   } catch (error) {
     next(error);
@@ -473,38 +295,18 @@ export const getGroupSettlements = async (req, res, next) => {
     const settlements = await prisma.settlement.findMany({
       where: { groupId },
       include: {
-        from: { select: { id: true, name: true, username: true, pubKey: true } },
-        to: { select: { id: true, name: true, username: true, pubKey: true } },
+        from: { select: { id: true, name: true, username: true } },
+        to: { select: { id: true, name: true, username: true } },
       },
       orderBy: { createdAt: "desc" },
     });
 
     return res.status(200).json(
-      new ApiResponse(200, settlements.map(formatSettlement), "Settlements fetched successfully")
-    );
-  } catch (error) {
-    next(error);
-  }
-};
-
-export const getWalletBalance = async (req, res, next) => {
-  try {
-    const pubKey = req.user.pubKey;
-    if (!pubKey) {
-      throw new ApiError(400, "Wallet public key not set");
-    }
-    const balance = await getBalance(pubKey);
-    return res.status(200).json(new ApiResponse(200, { balance, pubKey }, "Balance fetched"));
-  } catch (error) {
-    next(error);
-  }
-};
-
-export const getSolPrice = async (req, res, next) => {
-  try {
-    const { rates, updatedAt } = await getCachedExchangeRates();
-    return res.status(200).json(
-      new ApiResponse(200, { priceUSD: rates.usd, priceINR: rates.inr, updatedAt }, "SOL prices fetched")
+      new ApiResponse(
+        200,
+        settlements.map(formatSettlement),
+        "Settlements fetched successfully",
+      ),
     );
   } catch (error) {
     next(error);

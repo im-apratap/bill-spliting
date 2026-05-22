@@ -1,22 +1,14 @@
 import { Router } from "express";
 import {
   createSettlement,
-  confirmSettlement,
-  submitSignedTransaction,
   submitFiatSettlement,
   getGroupSettlements,
-  getWalletBalance,
-  getSolPrice,
 } from "../controllers/settlement.controller.js";
 import { verifyJWT } from "../middlewares/auth.middleware.js";
 const router = Router();
-router.route("/sol-price").get(getSolPrice);
 
 router.use(verifyJWT);
 router.route("/create").post(createSettlement);
-router.route("/confirm").post(confirmSettlement);
-router.route("/submit").post(submitSignedTransaction);
 router.route("/fiat-submit").post(submitFiatSettlement);
 router.route("/group/:groupId").get(getGroupSettlements);
-router.route("/balance").get(getWalletBalance);
 export default router;

@@ -13,8 +13,7 @@ model User {
   email          String          @unique
   username       String          @unique
   password       String
-  pubKey         String?         @unique
-  upiId          String?         // NEW FIAT FIELD
+  upiId          String?
   refreshToken   String?
   expoPushToken  String?
   createdAt      DateTime        @default(now())
@@ -110,8 +109,6 @@ model ExpenseShare {
 model Settlement {
   id               String   @id @default(uuid())
   amount           Float
-  amountInLamports Float
-  txSignature      String?
   status           String   @default("pending") // "pending", "confirmed", "failed"
   createdAt        DateTime @default(now())
   updatedAt        DateTime @updatedAt
@@ -145,7 +142,6 @@ model History {
   id          String   @id @default(uuid())
   actionType  String
   description String?
-  txSignature String?
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 

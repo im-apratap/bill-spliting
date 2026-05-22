@@ -33,33 +33,29 @@ export function useCurrencyPreference() {
     return preferredCurrency === "INR" ? "₹" : "$";
   };
 
-  const formatFiat = (
-    solAmount: number,
-    solPriceUSD: number,
-    solPriceINR: number,
-  ) => {
-    if (preferredCurrency === "INR" && solPriceINR) {
-      return `₹${(solAmount * solPriceINR).toFixed(2)}`;
-    }
-    return `$${(solAmount * (solPriceUSD || 0)).toFixed(2)}`;
-  };
+  const USD_TO_INR = 83;
 
-  const formatFiatFromUSD = (
-    usdAmount: number,
-    solPriceUSD: number,
-    solPriceINR: number,
-  ) => {
-    if (preferredCurrency === "INR" && solPriceINR && solPriceUSD) {
-      return `₹${(usdAmount * (solPriceINR / solPriceUSD)).toFixed(2)}`;
+  const formatFiatFromUSD = (usdAmount: number, usdToInr = USD_TO_INR) => {
+    if (preferredCurrency === "INR") {
+      return `₹${(usdAmount * usdToInr).toFixed(2)}`;
     }
     return `$${usdAmount.toFixed(2)}`;
+  };
+
+  const amountToUSD = (amount: number, usdToInr = USD_TO_INR) => {
+    return preferredCurrency === "INR" ? amount / usdToInr : amount;
+  };
+
+  const amountFromUSD = (usdAmount: number, usdToInr = USD_TO_INR) => {
+    return preferredCurrency === "INR" ? usdAmount * usdToInr : usdAmount;
   };
 
   return {
     preferredCurrency,
     toggleCurrency,
     getCurrencySymbol,
-    formatFiat,
     formatFiatFromUSD,
+    amountToUSD,
+    amountFromUSD,
   };
 }

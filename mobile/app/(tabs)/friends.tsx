@@ -18,7 +18,6 @@ type Friend = {
   _id: string;
   name: string;
   username: string;
-  pubKey: string;
 };
 type FriendRequest = {
   _id: string;

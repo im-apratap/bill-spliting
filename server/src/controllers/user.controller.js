@@ -56,7 +56,7 @@ const excludeFields = (user, keys) => {
 
 export const registerUser = async (req, res, next) => {
   try {
-    const { name, username, email, password, pubKey } = req.body;
+    const { name, username, email, password } = req.body;
     if (!name || !username || !email || !password) {
       throw new ApiError(400, "Name, username, email, and password are required");
     }
@@ -65,10 +65,6 @@ export const registerUser = async (req, res, next) => {
       { email },
       { username: username.toLowerCase() },
     ];
-
-    if (pubKey) {
-      orConditions.push({ pubKey });
-    }
 
     const existingUser = await prisma.user.findFirst({
       where: {
@@ -79,7 +75,7 @@ export const registerUser = async (req, res, next) => {
     if (existingUser) {
       throw new ApiError(
         400,
-        "User with this email, username" + (pubKey ? ", or pubKey" : "") + " already exists"
+        "User with this email or username already exists"
       );
     }
 
@@ -92,7 +88,6 @@ export const registerUser = async (req, res, next) => {
         username: username.toLowerCase(),
         email,
         password: hashedPassword,
-        pubKey,
       },
     });
 
@@ -239,26 +234,6 @@ export const getCurrentUser = async (req, res, next) => {
     return res
       .status(200)
       .json(new ApiResponse(200, req.user, "User fetched successfully"));
-  } catch (error) {
-    next(error);
-  }
-};
-
-export const updatePubKey = async (req, res, next) => {
-  try {
-    const { pubKey } = req.body;
-    if (!pubKey) throw new ApiError(400, "pubKey is required");
-
-    const user = await prisma.user.update({
-      where: { id: req.user.id },
-      data: { pubKey },
-    });
-
-    return res
-      .status(200)
-      .json(
-        new ApiResponse(200, excludeFields(user, ["password", "refreshToken"]), "Public key updated successfully")
-      );
   } catch (error) {
     next(error);
   }

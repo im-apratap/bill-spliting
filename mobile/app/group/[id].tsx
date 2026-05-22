@@ -16,7 +16,6 @@ import { Button } from "../../src/components/Button";
 import { colors } from "../../src/theme/colors";
 import { apiClient } from "../../src/api/client";
 import { FontAwesome5 } from "@expo/vector-icons";
-import { useSolPrice } from "../../src/hooks/useSolPrice";
 import { useCurrencyPreference } from "../../src/hooks/useCurrencyPreference";
 type TabType = "expenses" | "balances" | "members";
 export default function GroupDetailsScreen() {
@@ -27,7 +26,6 @@ export default function GroupDetailsScreen() {
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<TabType>("expenses");
   const [currentUserId, setCurrentUserId] = useState<string>("");
-  const { solPrice, solPriceINR } = useSolPrice();
   const { formatFiatFromUSD } = useCurrencyPreference();
   const fetchGroupData = React.useCallback(async () => {
     try {
@@ -144,11 +142,7 @@ export default function GroupDetailsScreen() {
               }}
             >
               <Text style={styles.expenseAmount}>
-                {formatFiatFromUSD(
-                  item.amount,
-                  solPrice || 1,
-                  solPriceINR || 1,
-                )}
+                {formatFiatFromUSD(item.amount)}
               </Text>
               <FontAwesome5
                 name="chevron-right"
@@ -176,17 +170,8 @@ export default function GroupDetailsScreen() {
             ]}
           >
             {balance > 0 ? "+" : ""}
-            {formatFiatFromUSD(
-              Math.abs(balance),
-              solPrice || 1,
-              solPriceINR || 1,
-            )}
+            {formatFiatFromUSD(Math.abs(balance))}
           </Text>
-          {solPrice !== null && balance !== 0 && (
-            <Text style={styles.balanceSolSubtext}>
-              ~ {Math.abs(balance / solPrice).toFixed(4)} SOL
-            </Text>
-          )}
         </View>
       </View>
     );

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useEffect, useState } from "react";
 import {
   View,
   StyleSheet,
@@ -6,7 +6,6 @@ import {
   ScrollView,
   ActivityIndicator,
   Modal,
-  TouchableOpacity,
   Alert,
 } from "react-native";
 import * as Linking from "expo-linking";
@@ -18,9 +17,10 @@ import { colors } from "../../src/theme/colors";
 import { apiClient } from "../../src/api/client";
 import { FontAwesome5 } from "@expo/vector-icons";
 import { Picker } from "@react-native-picker/picker";
-import { signTransactionOnDevice, openSolscanTx } from "../../src/utils/solana";
-import { useSolPrice } from "../../src/hooks/useSolPrice";
 import { useCurrencyPreference } from "../../src/hooks/useCurrencyPreference";
+
+const USD_TO_INR = 83;
+
 export default function CreateSettlementScreen() {
   const { groupId } = useLocalSearchParams();
   const [toUserId, setToUserId] = useState("");
@@ -31,25 +31,27 @@ export default function CreateSettlementScreen() {
   const [settlements, setSettlements] = useState<any[]>([]);
   const [currentUserId, setCurrentUserId] = useState<string>("");
   const [successModal, setSuccessModal] = useState(false);
-  const [paymentMode, setPaymentMode] = useState<"crypto" | "fiat">("crypto");
-  const [txSignature, setTxSignature] = useState<string | null>(null);
   const [settledAmount, setSettledAmount] = useState<string>("");
-  const [settledSolAmount, setSettledSolAmount] = useState<string>("");
-  const [settledRate, setSettledRate] = useState<string>("");
-  const { solPrice, solPriceINR } = useSolPrice();
-  const { preferredCurrency, getCurrencySymbol, formatFiatFromUSD } =
-    useCurrencyPreference();
+  const {
+    preferredCurrency,
+    getCurrencySymbol,
+    formatFiatFromUSD,
+    amountToUSD,
+    amountFromUSD,
+  } = useCurrencyPreference();
 
   const fetchData = React.useCallback(async () => {
     try {
       const userRes = await apiClient.get("/users/me");
       const loggedInUserId = userRes.data.data._id;
       setCurrentUserId(loggedInUserId);
-      const res = await apiClient.get(`/groups/${groupId}`);
-      const otherMembers = res.data.data.members.filter(
+
+      const groupRes = await apiClient.get(`/groups/${groupId}`);
+      const otherMembers = groupRes.data.data.members.filter(
         (m: any) => m._id !== loggedInUserId,
       );
       setMembers(otherMembers);
+
       const balanceRes = await apiClient.get(`/expenses/balances/${groupId}`);
       setSettlements(balanceRes.data.data.settlements);
       if (otherMembers.length > 0) {
@@ -60,151 +62,117 @@ export default function CreateSettlementScreen() {
       setError("Failed to fetch group data");
     }
   }, [groupId]);
+
   useEffect(() => {
     if (groupId) {
       fetchData();
     }
   }, [groupId, fetchData]);
+
   const handleCheckAmount = () => {
-    if (toUserId && settlements.length > 0 && currentUserId) {
-      const oweThem = settlements.find(
-        (s) => s.to._id === toUserId && s.from._id === currentUserId,
-      );
-      const theyOwe = settlements.find(
-        (s) => s.from._id === toUserId && s.to._id === currentUserId,
-      );
-      if (oweThem) {
-        const displayAmt =
-          preferredCurrency === "INR" && solPrice && solPriceINR
-            ? (oweThem.amount * (solPriceINR / solPrice)).toFixed(2)
-            : oweThem.amount.toString();
-        setAmount(displayAmt);
-        setError("");
-      } else if (theyOwe) {
-        setAmount("0");
-        setError(
-          `You don't owe them. They actually owe you ${formatFiatFromUSD(theyOwe.amount, solPrice || 1, solPriceINR || 1)}.`,
-        );
-      } else {
-        setAmount("0");
-        setError("You don't owe this user anything.");
-      }
-    } else {
+    if (!toUserId || settlements.length === 0 || !currentUserId) {
       setAmount("0");
       setError("No balances found or you don't owe anyone.");
+      return;
+    }
+
+    const oweThem = settlements.find(
+      (s) => s.to._id === toUserId && s.from._id === currentUserId,
+    );
+    const theyOwe = settlements.find(
+      (s) => s.from._id === toUserId && s.to._id === currentUserId,
+    );
+
+    if (oweThem) {
+      setAmount(amountFromUSD(oweThem.amount, USD_TO_INR).toFixed(2));
+      setError("");
+    } else if (theyOwe) {
+      setAmount("0");
+      setError(
+        `You don't owe them. They actually owe you ${formatFiatFromUSD(theyOwe.amount, USD_TO_INR)}.`,
+      );
+    } else {
+      setAmount("0");
+      setError("You don't owe this user anything.");
     }
   };
+
   const handleSettle = async () => {
     if (!toUserId || !amount || isNaN(Number(amount))) {
       setError("Please select a user and valid amount");
       return;
     }
+
     setLoading(true);
     setError("");
     try {
       const numericAmount = Number(amount);
-      const usdAmount =
-        preferredCurrency === "INR" && solPrice && solPriceINR
-          ? numericAmount / (solPriceINR / solPrice)
-          : numericAmount;
+      const usdAmount = amountToUSD(numericAmount, USD_TO_INR);
 
       const res = await apiClient.post("/settlements/create", {
         groupId,
         toUserId,
         amount: usdAmount,
-        isFiat: paymentMode === "fiat",
       });
 
-      if (paymentMode === "fiat") {
-        const { settlements } = res.data.data;
-        const s = settlements[0];
-        if (!s.toUpiId) {
-          throw new Error(`User @${s.to} has not set up their UPI ID yet.`);
-        }
-
-        const upiAmount =
-          preferredCurrency === "INR"
-            ? numericAmount
-            : numericAmount * ((solPriceINR || 1) / (solPrice || 1));
-
-        const upiUrl = `upi://pay?pa=${s.toUpiId}&pn=${s.to}&am=${upiAmount.toFixed(2)}&cu=INR`;
-        
-        try {
-          await Linking.openURL(upiUrl);
-        } catch (err) {
-          console.warn("Could not open UPI app, proceeding to confirmation", err);
-        }
-
-        Alert.alert(
-          "Confirm Payment",
-          "Did your UPI payment succeed?",
-          [
-            { text: "No", style: "cancel", onPress: () => setLoading(false) },
-            {
-              text: "Yes",
-              onPress: async () => {
-                try {
-                  const submitRes = await apiClient.post("/settlements/fiat-submit", {
-                    settlementIds: settlements.map((st: any) => st.settlementId),
-                  });
-                  setTxSignature(submitRes.data.data.txSignature || "FIAT_PAYMENT");
-                  setSettledAmount(amount);
-                  setSettledSolAmount("");
-                  setSuccessModal(true);
-                } catch (err: any) {
-                  setError(err.response?.data?.message || "Failed to confirm fiat payment");
-                } finally {
-                  setLoading(false);
-                }
-              },
-            },
-          ]
+      const { settlements: createdSettlements } = res.data.data;
+      const firstSettlement = createdSettlements[0];
+      if (!firstSettlement?.toUpiId) {
+        throw new Error(
+          `User @${firstSettlement?.to || "selected user"} has not set up their UPI ID yet.`,
         );
-        return; // Early return to wait for Alert callback
       }
 
-      const { serializedTransaction, settlements } = res.data.data;
-      if (!serializedTransaction) {
-        throw new Error("No transaction object received from server");
+      const upiAmount =
+        preferredCurrency === "INR" ? numericAmount : numericAmount * USD_TO_INR;
+      const upiUrl = `upi://pay?pa=${encodeURIComponent(
+        firstSettlement.toUpiId,
+      )}&pn=${encodeURIComponent(firstSettlement.to)}&am=${upiAmount.toFixed(
+        2,
+      )}&cu=INR`;
+
+      try {
+        await Linking.openURL(upiUrl);
+      } catch (err) {
+        console.warn("Could not open UPI app, proceeding to confirmation", err);
       }
-      const signedTransaction = await signTransactionOnDevice(
-        serializedTransaction,
-      );
-      const submitRes = await apiClient.post("/settlements/submit", {
-        settlementIds: settlements.map((s: any) => s.settlementId),
-        signedTransaction,
-      });
-      const signature = submitRes.data.data.txSignature;
-      setTxSignature(signature);
-      setSettledAmount(amount);
-      if (solPrice) {
-        const solAmt = usdAmount / solPrice;
-        setSettledSolAmount(solAmt.toFixed(6));
-        setSettledRate(solPrice.toFixed(2));
-      }
-      setSuccessModal(true);
+
+      Alert.alert("Confirm Payment", "Did your UPI payment succeed?", [
+        { text: "No", style: "cancel", onPress: () => setLoading(false) },
+        {
+          text: "Yes",
+          onPress: async () => {
+            try {
+              await apiClient.post("/settlements/fiat-submit", {
+                settlementIds: createdSettlements.map(
+                  (st: any) => st.settlementId,
+                ),
+              });
+              setSettledAmount(amount);
+              setSuccessModal(true);
+            } catch (err: any) {
+              setError(
+                err.response?.data?.message || "Failed to confirm payment",
+              );
+            } finally {
+              setLoading(false);
+            }
+          },
+        },
+      ]);
     } catch (err: any) {
-      setError(
-        err.response?.data?.message || err.message || "Failed to settle",
-      );
-    } finally {
-      if (paymentMode !== "fiat") {
-        setLoading(false);
-      }
+      setError(err.response?.data?.message || err.message || "Failed to settle");
+      setLoading(false);
     }
   };
-  const handleViewOnSolscan = () => {
-    if (txSignature) {
-      openSolscanTx(txSignature);
-    }
-  };
+
   const handleCloseSuccess = () => {
     setSuccessModal(false);
     router.back();
   };
+
   return (
     <Container>
-      {}
       <Modal
         visible={successModal}
         transparent
@@ -223,38 +191,8 @@ export default function CreateSettlementScreen() {
             <Text style={styles.successTitle}>Payment Sent!</Text>
             <Text style={styles.successSubtitle}>
               Successfully settled {getCurrencySymbol()}
-              {settledAmount} {paymentMode === "crypto" ? "on Solana" : "via UPI"}
+              {settledAmount} via UPI
             </Text>
-            {paymentMode === "crypto" && settledSolAmount !== "" && (
-              <View style={styles.solAmountBadge}>
-                <FontAwesome5 name="coins" size={14} color={colors.secondary} />
-                <Text style={styles.solAmountText}>{settledSolAmount} SOL</Text>
-                {settledRate !== "" && (
-                  <Text style={styles.solRateText}>at ${settledRate}/SOL</Text>
-                )}
-              </View>
-            )}
-            {txSignature && (
-              <View style={styles.txInfoContainer}>
-                <Text style={styles.txLabel}>Transaction Signature</Text>
-                <Text
-                  style={styles.txSignature}
-                  numberOfLines={1}
-                  ellipsizeMode="middle"
-                >
-                  {txSignature}
-                </Text>
-              </View>
-            )}
-            {paymentMode === "crypto" && txSignature && (
-              <TouchableOpacity
-                style={styles.solscanButton}
-                onPress={handleViewOnSolscan}
-              >
-                <FontAwesome5 name="external-link-alt" size={16} color="#FFF" />
-                <Text style={styles.solscanButtonText}>View on Solscan</Text>
-              </TouchableOpacity>
-            )}
             <Button
               title="Done"
               onPress={handleCloseSuccess}
@@ -264,62 +202,14 @@ export default function CreateSettlementScreen() {
           </View>
         </View>
       </Modal>
+
       <ScrollView contentContainerStyle={styles.content}>
         <View style={styles.header}>
           <Text style={styles.title}>Settle Up</Text>
-          <Text style={styles.subtitle}>
-            Pay your friends securely on Solana
-          </Text>
+          <Text style={styles.subtitle}>Pay your friends using UPI</Text>
         </View>
+
         <View style={styles.form}>
-          <View style={styles.paymentModeContainer}>
-            <TouchableOpacity
-              style={[
-                styles.modeTab,
-                paymentMode === "crypto" && styles.modeTabActive,
-              ]}
-              onPress={() => setPaymentMode("crypto")}
-            >
-              <FontAwesome5
-                name="coins"
-                size={16}
-                color={
-                  paymentMode === "crypto" ? colors.surfaceLight : colors.textMuted
-                }
-              />
-              <Text
-                style={[
-                  styles.modeTabText,
-                  paymentMode === "crypto" && styles.modeTabTextActive,
-                ]}
-              >
-                Crypto
-              </Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={[
-                styles.modeTab,
-                paymentMode === "fiat" && styles.modeTabActive,
-              ]}
-              onPress={() => setPaymentMode("fiat")}
-            >
-              <FontAwesome5
-                name="rupee-sign"
-                size={16}
-                color={
-                  paymentMode === "fiat" ? colors.surfaceLight : colors.textMuted
-                }
-              />
-              <Text
-                style={[
-                  styles.modeTabText,
-                  paymentMode === "fiat" && styles.modeTabTextActive,
-                ]}
-              >
-                Fiat (UPI)
-              </Text>
-            </TouchableOpacity>
-          </View>
           {error ? <Text style={styles.errorText}>{error}</Text> : null}
           {members.length === 0 ? (
             <ActivityIndicator color={colors.primary} />
@@ -344,6 +234,7 @@ export default function CreateSettlementScreen() {
               </View>
             </View>
           )}
+
           <Button
             title="Check Amount Owed"
             onPress={handleCheckAmount}
@@ -351,34 +242,14 @@ export default function CreateSettlementScreen() {
             style={styles.checkButton}
           />
           <Input
-            label={`Amount (in ${preferredCurrency} equivalent)`}
+            label={`Amount (${preferredCurrency})`}
             placeholder="0.00"
             value={amount}
             onChangeText={setAmount}
             keyboardType="decimal-pad"
           />
-          {amount !== "" &&
-            !isNaN(Number(amount)) &&
-            Number(amount) > 0 &&
-            solPrice !== null && (
-              <View style={styles.conversionPreview}>
-                <FontAwesome5
-                  name="exchange-alt"
-                  size={12}
-                  color={colors.secondary}
-                />
-                <Text style={styles.conversionText}>
-                  = {(Number(amount) / solPrice).toFixed(6)} SOL at $
-                  {solPrice.toFixed(2)}/SOL
-                </Text>
-              </View>
-            )}
           <Button
-            title={
-              paymentMode === "crypto"
-                ? "Sign & Send via Solana"
-                : "Pay via UPI App"
-            }
+            title="Pay via UPI App"
             onPress={handleSettle}
             loading={loading}
             style={styles.actionButton}
@@ -394,6 +265,7 @@ export default function CreateSettlementScreen() {
     </Container>
   );
 }
+
 const styles = StyleSheet.create({
   content: {
     padding: 24,
@@ -412,24 +284,26 @@ const styles = StyleSheet.create({
     color: colors.textMuted,
     marginTop: 8,
   },
-  checkoutBanner: {
-    flexDirection: "row",
-    alignItems: "center",
-    backgroundColor: colors.surfaceLight,
-    borderWidth: 1,
-    borderColor: colors.border,
-    padding: 16,
-    borderRadius: 24,
-    marginBottom: 24,
-  },
-  checkoutText: {
-    color: colors.primary,
-    marginLeft: 12,
-    fontSize: 16,
-    fontWeight: "700",
-  },
   form: {
     width: "100%",
+  },
+  pickerContainer: {
+    marginBottom: 16,
+  },
+  pickerLabel: {
+    color: colors.text,
+    fontWeight: "700",
+    marginBottom: 8,
+  },
+  pickerWrapper: {
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: 12,
+    overflow: "hidden",
+    backgroundColor: colors.surface,
+  },
+  picker: {
+    color: colors.text,
   },
   checkButton: {
     marginBottom: 16,
@@ -437,83 +311,25 @@ const styles = StyleSheet.create({
   actionButton: {
     marginTop: 16,
   },
-  paymentModeContainer: {
-    flexDirection: "row",
-    backgroundColor: colors.surfaceLight,
-    borderRadius: 12,
-    padding: 4,
-    marginBottom: 20,
-  },
-  modeTab: {
-    flex: 1,
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    paddingVertical: 12,
-    borderRadius: 8,
-  },
-  modeTabActive: {
-    backgroundColor: colors.primary,
-  },
-  modeTabText: {
-    color: colors.textMuted,
-    fontWeight: "600",
-    marginLeft: 8,
-    fontSize: 15,
-  },
-  modeTabTextActive: {
-    color: colors.surfaceLight,
-  },
   errorText: {
     color: colors.error,
-    textAlign: "center",
     marginBottom: 16,
-    fontSize: 14,
-  },
-  pickerContainer: {
-    marginBottom: 16,
-  },
-  pickerLabel: {
-    fontSize: 14,
     fontWeight: "600",
-    color: colors.text,
-    marginBottom: 8,
-    marginLeft: 4,
-  },
-  pickerWrapper: {
-    backgroundColor: colors.surfaceLight,
-    borderRadius: 16,
-    borderWidth: 1,
-    borderColor: colors.border,
-    overflow: "hidden",
-  },
-  picker: {
-    height: 56,
-    width: "100%",
-    color: colors.text,
   },
   modalOverlay: {
     flex: 1,
-    backgroundColor: "rgba(0, 0, 0, 0.6)",
+    backgroundColor: "rgba(0,0,0,0.45)",
     justifyContent: "center",
-    alignItems: "center",
     padding: 24,
   },
   modalContent: {
     backgroundColor: colors.surface,
-    borderRadius: 24,
-    padding: 32,
-    width: "100%",
-    maxWidth: 340,
+    borderRadius: 16,
+    padding: 24,
     alignItems: "center",
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.2,
-    shadowRadius: 24,
-    elevation: 8,
   },
   successIconContainer: {
-    marginBottom: 20,
+    marginBottom: 16,
   },
   successTitle: {
     fontSize: 24,
@@ -522,86 +338,12 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
   successSubtitle: {
-    fontSize: 16,
     color: colors.textMuted,
     textAlign: "center",
-    marginBottom: 24,
-  },
-  txInfoContainer: {
-    backgroundColor: colors.surfaceLight,
-    borderRadius: 12,
-    padding: 16,
-    width: "100%",
-    marginBottom: 24,
-    borderWidth: 1,
-    borderColor: colors.border,
-  },
-  txLabel: {
-    fontSize: 12,
-    color: colors.textMuted,
-    marginBottom: 6,
-    fontWeight: "600",
-  },
-  txSignature: {
-    fontSize: 14,
-    color: colors.primary,
-    fontFamily: "monospace",
-  },
-  solscanButton: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    backgroundColor: colors.secondary,
-    paddingVertical: 14,
-    paddingHorizontal: 24,
-    borderRadius: 999,
-    width: "100%",
-    marginBottom: 12,
-  },
-  solscanButtonText: {
-    color: "#FFF",
     fontSize: 16,
-    fontWeight: "700",
-    marginLeft: 10,
+    marginBottom: 24,
   },
   doneButton: {
     width: "100%",
-  },
-  conversionPreview: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    backgroundColor: "rgba(153, 69, 255, 0.1)",
-    paddingVertical: 10,
-    paddingHorizontal: 16,
-    borderRadius: 12,
-    marginTop: 12,
-    marginBottom: 16,
-  },
-  conversionText: {
-    marginLeft: 8,
-    color: colors.secondary,
-    fontSize: 14,
-    fontWeight: "600",
-  },
-  solAmountBadge: {
-    flexDirection: "row",
-    alignItems: "center",
-    backgroundColor: "rgba(20, 241, 149, 0.1)",
-    paddingVertical: 8,
-    paddingHorizontal: 16,
-    borderRadius: 20,
-    marginBottom: 20,
-  },
-  solAmountText: {
-    fontSize: 18,
-    fontWeight: "700",
-    color: colors.success,
-    marginLeft: 8,
-  },
-  solRateText: {
-    fontSize: 12,
-    color: colors.textMuted,
-    marginLeft: 8,
   },
 });

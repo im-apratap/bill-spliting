@@ -14,14 +14,12 @@ import { Button } from "../../src/components/Button";
 import { colors } from "../../src/theme/colors";
 import { apiClient } from "../../src/api/client";
 import { router, useFocusEffect } from "expo-router";
-import { useSolPrice } from "../../src/hooks/useSolPrice";
 export default function HomeScreen() {
   const [groups, setGroups] = useState([]);
   const [user, setUser] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState("");
-  const { solPrice, solPriceINR, loading: priceLoading } = useSolPrice();
   const fetchData = async () => {
     try {
       setError("");
@@ -87,31 +85,8 @@ export default function HomeScreen() {
           <Text style={styles.greetingTitle}>
             Hello, {user?.name?.split(" ")[0] || "User"}
           </Text>
-          <Text style={styles.greetingSubtitle}>Welcome to OmniSplit</Text>
+          <Text style={styles.greetingSubtitle}>Split expenses and settle up</Text>
         </View>
-        {}
-        <View style={styles.priceBanner}>
-          <View style={styles.priceBannerLeft}>
-            <View style={styles.solIconContainer}>
-              <FontAwesome5 name="coins" size={16} color={colors.secondary} />
-            </View>
-            <View>
-              <Text style={styles.priceBannerLabel}>EXCHANGE RATES</Text>
-              {priceLoading || solPrice === null || solPriceINR === null ? (
-                <ActivityIndicator size="small" color={colors.secondary} />
-              ) : (
-                <Text style={styles.priceBannerValue}>
-                  1 SOL = ${solPrice.toFixed(2)} = ₹{solPriceINR.toFixed(2)}
-                </Text>
-              )}
-            </View>
-          </View>
-          <View style={styles.priceBannerBadge}>
-            <View style={styles.liveDot} />
-            <Text style={styles.priceBannerBadgeText}>LIVE</Text>
-          </View>
-        </View>
-        {}
         {}
         {error ? (
           <View style={styles.errorContainer}>
@@ -182,68 +157,6 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: colors.textMuted,
     marginTop: 6,
-  },
-  priceBanner: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    backgroundColor: colors.surface,
-    borderRadius: 20,
-    paddingVertical: 14,
-    paddingHorizontal: 18,
-    marginBottom: 24,
-    borderWidth: 1,
-    borderColor: colors.border,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.04,
-    shadowRadius: 6,
-    elevation: 2,
-  },
-  priceBannerLeft: {
-    flexDirection: "row",
-    alignItems: "center",
-  },
-  solIconContainer: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: "rgba(153, 69, 255, 0.1)",
-    alignItems: "center",
-    justifyContent: "center",
-    marginRight: 12,
-  },
-  priceBannerLabel: {
-    fontSize: 12,
-    color: colors.textMuted,
-    fontWeight: "600",
-  },
-  priceBannerValue: {
-    fontSize: 16,
-    fontWeight: "800",
-    color: colors.primary,
-    marginTop: 2,
-  },
-  priceBannerBadge: {
-    flexDirection: "row",
-    alignItems: "center",
-    backgroundColor: "rgba(20, 241, 149, 0.1)",
-    paddingVertical: 5,
-    paddingHorizontal: 10,
-    borderRadius: 999,
-  },
-  liveDot: {
-    width: 6,
-    height: 6,
-    borderRadius: 3,
-    backgroundColor: colors.success,
-    marginRight: 5,
-  },
-  priceBannerBadgeText: {
-    fontSize: 11,
-    fontWeight: "700",
-    color: colors.success,
-    letterSpacing: 1,
   },
   listContent: {
     paddingBottom: 40,

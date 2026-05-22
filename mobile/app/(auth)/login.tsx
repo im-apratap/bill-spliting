@@ -59,9 +59,9 @@ export default function LoginScreen() {
         <ScrollView contentContainerStyle={styles.scrollContent}>
           <View style={styles.header}>
             <Text style={styles.title}>
-              Sol<Text style={styles.highlight}>Share</Text>
+              Omni<Text style={styles.highlight}>Split</Text>
             </Text>
-            <Text style={styles.subtitle}>Settle up on the Solana network</Text>
+            <Text style={styles.subtitle}>Split expenses and settle up with UPI</Text>
           </View>
           <View style={styles.form}>
             {error ? <Text style={styles.errorText}>{error}</Text> : null}

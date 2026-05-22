@@ -38,10 +38,10 @@ apiClient.interceptors.request.use(
 );
 
 let isRefreshing = false;
-let failedQueue: Array<{
+let failedQueue: {
   resolve: (value?: unknown) => void;
   reject: (reason?: any) => void;
-}> = [];
+}[] = [];
 
 const processQueue = (error: any, token: string | null = null) => {
   failedQueue.forEach((prom) => {
@@ -60,6 +60,10 @@ apiClient.interceptors.response.use(
   },
   async (error) => {
     const originalRequest = error.config;
+    if (!originalRequest) {
+      return Promise.reject(error);
+    }
+
     if (originalRequest.url?.includes("/users/refresh-token")) {
       await clearTokens();
       return Promise.reject(error);

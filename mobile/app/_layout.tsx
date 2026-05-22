@@ -8,7 +8,6 @@ import {
   sendPushTokenToBackend,
 } from "../src/utils/notifications";
 import { usePushNotifications } from "../src/hooks/usePushNotifications";
-import { SolPriceProvider } from "../src/hooks/useSolPrice";
 export default function RootLayout() {
   const [isAuthenticated, setIsAuthenticated] = useState<boolean | null>(null);
   usePushNotifications();
@@ -58,14 +57,12 @@ export default function RootLayout() {
     );
   }
   return (
-    <SolPriceProvider>
-      <Stack screenOptions={{ headerShown: false }}>
-        <Stack.Screen name="(auth)" />
-        <Stack.Screen name="(tabs)" />
-        <Stack.Screen name="group/[id]" />
-        <Stack.Screen name="expense/create" />
-        <Stack.Screen name="settlement/create" />
-      </Stack>
-    </SolPriceProvider>
+    <Stack screenOptions={{ headerShown: false }}>
+      <Stack.Screen name="(auth)" />
+      <Stack.Screen name="(tabs)" />
+      <Stack.Screen name="group/[id]" />
+      <Stack.Screen name="expense/create" />
+      <Stack.Screen name="settlement/create" />
+    </Stack>
   );
 }

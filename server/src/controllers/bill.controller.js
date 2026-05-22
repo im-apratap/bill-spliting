@@ -2,31 +2,6 @@ import { GoogleGenerativeAI } from "@google/generative-ai";
 import { ApiError } from "../utils/ApiError.js";
 import { ApiResponse } from "../utils/ApiResponse.js";
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
-export const getSolPrice = async (req, res, next) => {
-  try {
-    const currency = (req.query.currency || "inr").toLowerCase();
-    const response = await fetch(
-      `https://api.coingecko.com/api/v3/simple/price?ids=solana&vs_currencies=${currency}`,
-    );
-    const data = await response.json();
-    if (data.solana && data.solana[currency]) {
-      return res.status(200).json(
-        new ApiResponse(
-          200,
-          {
-            currency: currency.toUpperCase(),
-            solPrice: data.solana[currency],
-          },
-          "SOL price fetched",
-        ),
-      );
-    }
-    throw new ApiError(404, `Could not fetch SOL price for ${currency}`);
-  } catch (error) {
-    if (error instanceof ApiError) return next(error);
-    next(new ApiError(500, "Failed to fetch SOL price"));
-  }
-};
 export const scanBill = async (req, res, next) => {
   try {
     const { image } = req.body;
