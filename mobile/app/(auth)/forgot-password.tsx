@@ -12,44 +12,39 @@ import { Container } from "../../src/components/Container";
 import { Input } from "../../src/components/Input";
 import { Button } from "../../src/components/Button";
 import { colors } from "../../src/theme/colors";
-import { apiClient, setTokens } from "../../src/api/client";
-import {
-  registerForPushNotificationsAsync,
-  sendPushTokenToBackend,
-} from "../../src/utils/notifications";
-export default function LoginScreen() {
+import { apiClient } from "../../src/api/client";
+
+export default function ForgotPasswordScreen() {
   const [emailOrUsername, setEmailOrUsername] = useState("");
-  const [password, setPassword] = useState("");
+  const [newPassword, setNewPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
-  const handleLogin = async () => {
-    if (!emailOrUsername || !password) {
+  const [success, setSuccess] = useState("");
+
+  const handleResetPassword = async () => {
+    if (!emailOrUsername || !newPassword) {
       setError("Please fill in all fields");
       return;
     }
     setLoading(true);
     setError("");
+    setSuccess("");
     try {
-      const payload: any = { password };
-      if (emailOrUsername.includes("@")) {
-        payload.email = emailOrUsername.toLowerCase().trim();
-      } else {
-        payload.username = emailOrUsername.toLowerCase().trim();
-      }
-      const response = await apiClient.post("/users/login", payload);
-      const { accessToken, refreshToken } = response.data.data;
-      await setTokens(accessToken, refreshToken);
-      const pushToken = await registerForPushNotificationsAsync();
-      if (pushToken) {
-        await sendPushTokenToBackend(pushToken);
-      }
-      router.replace("/(tabs)/home");
+      await apiClient.put("/users/reset-password", {
+        emailOrUsername: emailOrUsername.toLowerCase().trim(),
+        newPassword,
+      });
+      setSuccess("Password reset successfully. You can now login.");
+      setTimeout(() => {
+        router.replace("/(auth)/login");
+      }, 2000);
     } catch (err: any) {
-      setError(err.response?.data?.message || err.message || "Failed to login");
+      setError(err.response?.data?.message || err.message || "Failed to reset password");
     } finally {
       setLoading(false);
     }
   };
+
   return (
     <Container>
       <KeyboardAvoidingView
@@ -58,13 +53,14 @@ export default function LoginScreen() {
       >
         <ScrollView contentContainerStyle={styles.scrollContent}>
           <View style={styles.header}>
-            <Text style={styles.title}>
-              Sol<Text style={styles.highlight}>Share</Text>
-            </Text>
-            <Text style={styles.subtitle}>Settle up on the Solana network</Text>
+            <Text style={styles.title}>Reset Password</Text>
+            <Text style={styles.subtitle}>Create a new password for your account</Text>
           </View>
+
           <View style={styles.form}>
             {error ? <Text style={styles.errorText}>{error}</Text> : null}
+            {success ? <Text style={styles.successText}>{success}</Text> : null}
+
             <Input
               label="Email or Username"
               placeholder="Enter your email or username"
@@ -74,29 +70,23 @@ export default function LoginScreen() {
               keyboardType="email-address"
             />
             <Input
-              label="Password"
-              placeholder="Enter your password"
-              value={password}
-              onChangeText={setPassword}
+              label="New Password"
+              placeholder="Enter your new password"
+              value={newPassword}
+              onChangeText={setNewPassword}
               secureTextEntry
             />
-            <View style={styles.forgotPasswordContainer}>
-              <Link href="/(auth)/forgot-password" asChild>
-                <Text style={styles.forgotPasswordText}>Forgot Password?</Text>
-              </Link>
-            </View>
+
             <Button
-              title="Sign In"
-              onPress={handleLogin}
+              title="Reset Password"
+              onPress={handleResetPassword}
               loading={loading}
-              style={styles.loginButton}
+              style={styles.resetButton}
             />
+
             <View style={styles.footer}>
-              <Text style={styles.footerText}>
-                Don&apos;t have an account?{" "}
-              </Text>
-              <Link href="/(auth)/register" asChild>
-                <Text style={styles.linkText}>Sign Up</Text>
+              <Link href="/(auth)/login" asChild>
+                <Text style={styles.linkText}>Back to Login</Text>
               </Link>
             </View>
           </View>
@@ -105,6 +95,7 @@ export default function LoginScreen() {
     </Container>
   );
 }
+
 const styles = StyleSheet.create({
   keyboardView: {
     flex: 1,
@@ -119,23 +110,21 @@ const styles = StyleSheet.create({
     marginBottom: 48,
   },
   title: {
-    fontSize: 42,
+    fontSize: 32,
     fontWeight: "800",
     color: colors.primary,
     letterSpacing: -1,
-  },
-  highlight: {
-    color: colors.secondary,
   },
   subtitle: {
     fontSize: 16,
     color: colors.textMuted,
     marginTop: 8,
+    textAlign: "center",
   },
   form: {
     width: "100%",
   },
-  loginButton: {
+  resetButton: {
     marginTop: 24,
   },
   errorText: {
@@ -144,13 +133,10 @@ const styles = StyleSheet.create({
     marginBottom: 16,
     fontSize: 14,
   },
-  forgotPasswordContainer: {
-    alignItems: "flex-end",
-    marginTop: -8,
-    marginBottom: 8,
-  },
-  forgotPasswordText: {
-    color: colors.primary,
+  successText: {
+    color: "#10B981", // Emerald green for success
+    textAlign: "center",
+    marginBottom: 16,
     fontSize: 14,
     fontWeight: "600",
   },
@@ -158,10 +144,6 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     justifyContent: "center",
     marginTop: 32,
-  },
-  footerText: {
-    color: colors.textMuted,
-    fontSize: 14,
   },
   linkText: {
     color: colors.primary,

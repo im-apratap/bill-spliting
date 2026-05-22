@@ -13,7 +13,7 @@ model User {
   email          String          @unique
   username       String          @unique
   password       String
-  pubKey         String          @unique
+  pubKey         String?         @unique
   upiId          String?         // NEW FIAT FIELD
   refreshToken   String?
   expoPushToken  String?

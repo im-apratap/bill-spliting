@@ -57,24 +57,29 @@ const excludeFields = (user, keys) => {
 export const registerUser = async (req, res, next) => {
   try {
     const { name, username, email, password, pubKey } = req.body;
-    if (!name || !username || !email || !password || !pubKey) {
-      throw new ApiError(400, "All fields are required");
+    if (!name || !username || !email || !password) {
+      throw new ApiError(400, "Name, username, email, and password are required");
+    }
+
+    const orConditions = [
+      { email },
+      { username: username.toLowerCase() },
+    ];
+
+    if (pubKey) {
+      orConditions.push({ pubKey });
     }
 
     const existingUser = await prisma.user.findFirst({
       where: {
-        OR: [
-          { email },
-          { username: username.toLowerCase() },
-          { pubKey },
-        ],
+        OR: orConditions,
       },
     });
 
     if (existingUser) {
       throw new ApiError(
         400,
-        "User with this email, username, or pubKey already exists"
+        "User with this email, username" + (pubKey ? ", or pubKey" : "") + " already exists"
       );
     }
 
@@ -292,6 +297,42 @@ export const updateUpiId = async (req, res, next) => {
       .json(
         new ApiResponse(200, excludeFields(user, ["password", "refreshToken"]), "UPI ID updated successfully")
       );
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const resetPassword = async (req, res, next) => {
+  try {
+    const { emailOrUsername, newPassword } = req.body;
+    if (!emailOrUsername || !newPassword) {
+      throw new ApiError(400, "Email/Username and new password are required");
+    }
+
+    const user = await prisma.user.findFirst({
+      where: {
+        OR: [
+          { email: emailOrUsername.toLowerCase().trim() },
+          { username: emailOrUsername.toLowerCase().trim() },
+        ],
+      },
+    });
+
+    if (!user) {
+      throw new ApiError(404, "User not found");
+    }
+
+    const salt = await bcrypt.genSalt(10);
+    const hashedPassword = await bcrypt.hash(newPassword, salt);
+
+    await prisma.user.update({
+      where: { id: user.id },
+      data: { password: hashedPassword },
+    });
+
+    return res
+      .status(200)
+      .json(new ApiResponse(200, {}, "Password reset successfully"));
   } catch (error) {
     next(error);
   }
