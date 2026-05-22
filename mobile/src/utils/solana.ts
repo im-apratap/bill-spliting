@@ -1,7 +1,8 @@
-import { transact } from "@solana-mobile/mobile-wallet-adapter-protocol-web3js";
 import { Connection, Transaction, VersionedTransaction } from "@solana/web3.js";
 import { Buffer } from "buffer";
 import * as Linking from "expo-linking";
+import { Platform } from "react-native";
+
 if (typeof global.Buffer === "undefined") {
   global.Buffer = Buffer;
 }
@@ -29,8 +30,24 @@ export async function openSolscanTx(txSignature: string): Promise<void> {
   const url = getSolscanUrl(txSignature);
   await Linking.openURL(url);
 }
+
+async function transactWithMobileWallet<T>(
+  callback: Parameters<
+    typeof import("@solana-mobile/mobile-wallet-adapter-protocol-web3js").transact
+  >[0],
+): Promise<T> {
+  if (Platform.OS !== "android") {
+    throw new Error("Solana mobile wallet payments are only supported on Android.");
+  }
+
+  const { transact } = await import(
+    "@solana-mobile/mobile-wallet-adapter-protocol-web3js"
+  );
+  return transact(callback) as Promise<T>;
+}
+
 export async function connectWallet(): Promise<string> {
-  return await transact(async (wallet) => {
+  return await transactWithMobileWallet<string>(async (wallet) => {
     const authorizationResult = await wallet.authorize({
       cluster: "mainnet-beta",
       identity: APP_IDENTITY,
@@ -41,7 +58,7 @@ export async function connectWallet(): Promise<string> {
 export async function signTransactionOnDevice(
   base64Transaction: string,
 ): Promise<string> {
-  return await transact(async (wallet) => {
+  return await transactWithMobileWallet<string>(async (wallet) => {
     await wallet.authorize({
       cluster: "mainnet-beta",
       identity: APP_IDENTITY,
